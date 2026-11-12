@@ -165,6 +165,19 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
       let r = await pedirCom({ atualizar_no_banco: "true" });
       if (r.status === 422) r = await pedirCom();
       if (r.ok) return;
+      // Sem a permissão "Actions", usa o pedido geral do repositório, que a
+      // chave já pode fazer com "Contents: Read and write" (a tarefa escuta os dois).
+      if (r.status === 403 || r.status === 404) {
+        const geral = await pedir("/dispatches", {
+          method: "POST",
+          body: JSON.stringify({
+            event_type: "buscar-no-banco",
+            client_payload: { atualizar_no_banco: true },
+          }),
+        });
+        if (geral.ok) return;
+        if (r.status === 403 && geral.status !== 404) r = geral;
+      }
       if (r.status === 404) {
         throw new Error(
           "A busca no banco ainda não está instalada no repositório dos dados (falta o arquivo da tarefa).",
@@ -172,7 +185,7 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
       }
       if (r.status === 403) {
         throw new Error(
-          'A chave não pode iniciar a busca. No GitHub, edite a chave e dê a permissão "Actions: Read and write".',
+          'A chave não pode iniciar a busca. No GitHub, edite a chave e dê a permissão "Contents: Read and write" ao repositório dos dados.',
         );
       }
       throw falha(r);
@@ -180,18 +193,22 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
 
     async andamentoDaBusca(): Promise<AndamentoBusca | null> {
       const r = await pedir(
-        `/actions/workflows/${TAREFA_OPEN_FINANCE}/runs?event=workflow_dispatch&per_page=1`,
+        `/actions/workflows/${TAREFA_OPEN_FINANCE}/runs?per_page=5`,
       );
+      // Sem a permissão "Actions: Read" não dá para acompanhar: o app espera o
+      // arquivo de situação mudar.
       if (!r.ok) return null;
       const dados = (await r.json()) as {
         workflow_runs?: {
+          event: string;
           status: string;
           conclusion: string | null;
           created_at: string;
           html_url: string;
         }[];
       };
-      const ultima = dados.workflow_runs?.[0];
+      // A mais recente pedida pelo app ou à mão (as das 7h, 13h e 19h ficam de fora).
+      const ultima = dados.workflow_runs?.find((w) => w.event !== "schedule");
       if (!ultima) return null;
       const situacao: AndamentoBusca["situacao"] =
         ultima.status !== "completed"

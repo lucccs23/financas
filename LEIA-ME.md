@@ -299,8 +299,9 @@ Meu Pluggy e depois toque em Atualizar.
    - **Secrets:** `PLUGGY_CLIENT_ID` e `PLUGGY_CLIENT_SECRET`;
    - **Variables:** `PLUGGY_CONEXOES`, uma conexão por linha, no formato
      `id-da-conexao = Nome do perfil no app`.
-5. Para o botão **Atualizar**, a chave de acesso do app precisa também da
-   permissão **Actions: Read and write** (edite a chave no GitHub).
+5. O botão **Atualizar** funciona com a chave que o app já usa (**Contents:
+   Read and write**). Com a permissão **Actions: Read** a mais, o botão também
+   mostra o andamento (na fila, buscando) e o link de uma busca que falhou.
 
 Para conectar os bancos de outra pessoa da casa, ela faz os passos 1 e 3 na
 conta dela do Meu Pluggy, autorizando a mesma aplicação, e você acrescenta as

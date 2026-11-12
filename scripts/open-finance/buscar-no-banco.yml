@@ -1,8 +1,9 @@
 # Vai no repositório PRIVADO dos dados, em .github/workflows/buscar-no-banco.yml.
 #
 # Busca no Open Finance (via Pluggy) as contas, cartões e movimentações e grava
-# no financas.json. Roda 3 vezes por dia e também pelo botão "Buscar agora" do
-# app (ou em Actions > Buscar no banco > Run workflow).
+# no financas.json. Roda 3 vezes por dia e também pelo botão Atualizar do app
+# (ou em Actions > Buscar no banco > Run workflow). O app usa o pedido
+# "repository_dispatch", que a chave dele já pode fazer (Contents: Read and write).
 #
 # Precisa, em Settings > Secrets and variables > Actions:
 #   Secrets:   PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET
@@ -25,6 +26,8 @@ on:
         description: "Pedir aos bancos dados novos antes de buscar (não vale para conexões do Meu Pluggy)"
         type: boolean
         default: false
+  repository_dispatch:
+    types: [buscar-no-banco]
 
 permissions:
   contents: write
@@ -62,7 +65,7 @@ jobs:
           PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
           PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES || secrets.PLUGGY_CONEXOES }}
           DIAGNOSTICO: ${{ inputs.diagnostico && '1' || '' }}
-          ATUALIZAR_NO_BANCO: ${{ inputs.atualizar_no_banco && '1' || '' }}
+          ATUALIZAR_NO_BANCO: ${{ (inputs.atualizar_no_banco || github.event.client_payload.atualizar_no_banco) && '1' || '' }}
         run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
       - name: Gravar nos dados
         working-directory: dados
