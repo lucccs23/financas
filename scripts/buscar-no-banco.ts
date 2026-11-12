@@ -104,7 +104,12 @@ async function pluggy<T>(
     if (r.status === 404 && caminho.startsWith("/items/")) {
       throw new Error("Conexão não encontrada na Pluggy. Confira o id em PLUGGY_CONEXOES.");
     }
-    if (!r.ok) throw new Error(`A Pluggy respondeu com erro ${r.status}. Tente de novo mais tarde.`);
+    if (!r.ok) {
+      // A Pluggy explica o erro no corpo da resposta ("message", "codeDescription").
+      const corpo = (await r.json().catch(() => ({}))) as { message?: string; codeDescription?: string };
+      const motivo = [corpo.codeDescription, corpo.message].filter(Boolean).join(": ");
+      throw new Error(`A Pluggy respondeu com erro ${r.status}${motivo ? ` (${motivo})` : ""}.`);
+    }
     return (await r.json()) as T;
   }
 }
