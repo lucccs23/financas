@@ -182,7 +182,7 @@ export default function PaginaAnalises() {
           <div className="grid grid-cols-2 gap-4 sm:gap-6 xl:grid-cols-4">
             <Destaque
               icone={Wallet}
-              rotulo={`Gasto em ${mesMin}${emAndamento ? " até hoje" : ""}`}
+              rotulo={emAndamento ? "Gasto até hoje" : `Gasto em ${mesMin}`}
               rodape={
                 n.mediaAnterior > 0 ? (
                   <span className="flex flex-wrap items-center gap-2">
@@ -209,7 +209,7 @@ export default function PaginaAnalises() {
             </Destaque>
             <Destaque
               icone={Receipt}
-              rotulo="Compras e pagamentos"
+              rotulo="Lançamentos"
               rodape={`${formatar(n.ticketMedio)} em média cada`}
             >
               <p className="tabular text-[28px]/none font-semibold text-ink">
@@ -251,12 +251,12 @@ export default function PaginaAnalises() {
                   {
                     id: "cartao",
                     rotulo: "No cartão",
-                    cor: "var(--seg-pessoal)",
+                    cor: "var(--s1)",
                   },
                   {
                     id: "conta",
                     rotulo: "Fora do cartão",
-                    cor: "var(--seg-dia)",
+                    cor: "var(--s2)",
                   },
                 ]}
                 grupos={porMes.map((p) => ({
@@ -316,15 +316,13 @@ export default function PaginaAnalises() {
 
           <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] xl:items-start">
             <Painel className="p-4 sm:p-6">
-              <TituloPainel detalhe="últimos 6 meses">
-                Categorias ao longo do tempo
-              </TituloPainel>
+              <TituloPainel detalhe="6 meses">Categorias no tempo</TituloPainel>
               <p className="mt-1 text-[13px]/5 text-ink-3">
                 {mesMin[0].toUpperCase() + mesMin.slice(1)} comparado com a
                 média dos meses anteriores.
               </p>
               <div className="rolagem-fina mt-4 overflow-x-auto">
-                <table className="w-full min-w-[480px] text-sm">
+                <table className="w-full min-w-[480px] text-sm [&_td]:whitespace-nowrap [&_th]:whitespace-nowrap">
                   <thead>
                     <tr className="text-left text-xs text-ink-3">
                       <th className="py-2 font-medium">Categoria</th>

@@ -72,17 +72,17 @@ function ItemLegenda({
       <p className="flex items-center gap-2 text-xs text-ink-3">
         {cor && <Ponto cor={cor} />}
         <span className="truncate">{rotulo}</span>
-      </p>
-      <p className="tabular mt-1 flex items-baseline gap-2 text-[15px]/6 font-semibold tracking-[-0.01em] text-ink">
-        <span className="truncate">
-          {prefixo}
-          {formatar(valor)}
-        </span>
         {fracao != null && (
-          <span className="text-xs font-normal text-ink-3">
+          <span className="tabular shrink-0 whitespace-nowrap">
             · {porcento(fracao)}
           </span>
         )}
+      </p>
+      <p className="tabular mt-1 flex items-baseline gap-2 text-[15px]/6 font-semibold tracking-[-0.01em] whitespace-nowrap text-ink">
+        <span>
+          {prefixo}
+          {formatar(valor)}
+        </span>
         {acao}
       </p>
     </div>

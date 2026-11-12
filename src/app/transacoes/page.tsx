@@ -227,14 +227,14 @@ export default function PaginaTransacoes() {
               { valor: "transferencia", rotulo: "Transf." },
             ]}
           />
-          <div className="w-42">
+          <div className="w-40">
             <Selecao
               aria-label="Categoria"
               value={cat}
               onChange={(e) => setCat(e.target.value)}
               className="!h-10"
             >
-              <option value="">Todas as categorias</option>
+              <option value="">Categorias</option>
               {categoriasUsadas.map((c) => (
                 <option key={c} value={c}>
                   {categoria(c).nome}
@@ -243,14 +243,14 @@ export default function PaginaTransacoes() {
             </Selecao>
           </div>
           {dados.carteiras.length > 0 && (
-            <div className="w-42">
+            <div className="w-40">
               <Selecao
                 aria-label="Carteira"
                 value={carteiraId}
                 onChange={(e) => setCarteiraId(e.target.value)}
                 className="!h-10"
               >
-                <option value="">Todas as carteiras</option>
+                <option value="">Carteiras</option>
                 {dados.carteiras.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.nome}

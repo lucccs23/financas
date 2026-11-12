@@ -8,7 +8,13 @@ import { formatar } from "@/lib/dinheiro";
 import { addMes, intervalo, mesEixo, nomeMes } from "@/lib/meses";
 import { Colunas } from "@/components/graficos";
 import { GastosPorCategoria } from "@/components/gastos-categoria";
-import { CabecalhoPagina, cx, Painel, TituloPainel, Valor } from "@/components/ui";
+import {
+  CabecalhoPagina,
+  cx,
+  Painel,
+  TituloPainel,
+  Valor,
+} from "@/components/ui";
 
 function LinhaDetalhe({
   nome,
@@ -23,12 +29,20 @@ function LinhaDetalhe({
 }) {
   return (
     <li className="flex items-baseline justify-between gap-4 border-b border-line py-2 text-sm last:border-0">
-      <span className={cx("min-w-0 truncate", forte ? "font-medium text-ink" : "text-ink-2")}>
+      <span
+        className={cx(
+          "min-w-0 truncate",
+          forte ? "font-medium text-ink" : "text-ink-2",
+        )}
+      >
         {nome}
         {detalhe && <span className="text-xs text-ink-3"> · {detalhe}</span>}
       </span>
       <span
-        className={cx("tabular whitespace-nowrap", forte ? "font-semibold text-ink" : "text-ink-2")}
+        className={cx(
+          "tabular whitespace-nowrap",
+          forte ? "font-semibold text-ink" : "text-ink-2",
+        )}
       >
         {formatar(valor)}
       </span>
@@ -40,8 +54,14 @@ export default function PaginaFluxo() {
   const { dados, mes, mesHoje, setMes, lar } = useApp();
   const perfil = usePerfil();
   const meses = useMemo(() => intervalo(addMes(mes, -5), 12), [mes]);
-  const pontos = useMemo(() => fluxoDeCaixa(dados, perfil.id, meses), [dados, perfil.id, meses]);
-  const r = useMemo(() => resumoPessoal(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  const pontos = useMemo(
+    () => fluxoDeCaixa(dados, perfil.id, meses),
+    [dados, perfil.id, meses],
+  );
+  const r = useMemo(
+    () => resumoPessoal(dados, perfil.id, mes),
+    [dados, perfil.id, mes],
+  );
   const mesMin = nomeMes(mes).toLowerCase();
   const acumulado = pontos.reduce((s, p) => s + p.sobra, 0);
 
@@ -65,13 +85,19 @@ export default function PaginaFluxo() {
             <ArrowDownRight size={16} style={{ color: "var(--saida)" }} />
             Saídas de {mesMin}
           </p>
-          <Valor centavos={r.saidas} className="mt-2 text-[28px] leading-none" />
+          <Valor
+            centavos={r.saidas}
+            className="mt-2 text-[28px] leading-none"
+          />
         </Painel>
         <Painel className="p-6">
           <p className="text-[13px]/5 text-ink-3">Sobra somada dos 12 meses</p>
           <Valor
             centavos={acumulado}
-            className={cx("mt-2 text-[28px] leading-none", acumulado < 0 && "!text-bad-text")}
+            className={cx(
+              "mt-2 text-[28px] leading-none",
+              acumulado < 0 && "!text-bad-text",
+            )}
           />
         </Painel>
       </div>
@@ -79,7 +105,9 @@ export default function PaginaFluxo() {
       <div className="grid gap-4 sm:gap-6 xl:grid-cols-2">
         <Painel className="p-4 sm:p-6">
           <TituloPainel>Entradas e saídas</TituloPainel>
-          <p className="mt-1 mb-6 text-[13px]/5 text-ink-3">Clique em um mês para abrir.</p>
+          <p className="mt-1 mb-6 text-[13px]/5 text-ink-3">
+            Clique em um mês para abrir.
+          </p>
           <Colunas
             rotulo="Entradas e saídas por mês"
             selecionado={mes}
@@ -107,7 +135,12 @@ export default function PaginaFluxo() {
             selecionado={mes}
             onEscolher={setMes}
             series={[
-              { id: "sobra", rotulo: "Sobra", cor: "var(--seg-sobra)", corNegativa: "var(--bad)" },
+              {
+                id: "sobra",
+                rotulo: "Sobra",
+                cor: "var(--seg-sobra)",
+                corNegativa: "var(--bad)",
+              },
             ]}
             grupos={pontos.map((p) => ({
               chave: p.mes,
@@ -120,11 +153,11 @@ export default function PaginaFluxo() {
 
       <GastosPorCategoria />
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start ultra:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start ultra:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Painel className="p-4 sm:p-6">
           <TituloPainel>Mês a mês</TituloPainel>
           <div className="-mx-4 mt-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
-            <table className="w-full min-w-[640px] text-[13px]/5">
+            <table className="w-full min-w-[560px] text-[13px]/5">
               <thead>
                 <tr className="text-left text-xs text-ink-3">
                   <th className="pb-2 font-medium">Mês</th>
@@ -147,12 +180,22 @@ export default function PaginaFluxo() {
                   >
                     <td className="rounded-l-lg py-2 pl-2 font-medium text-ink">
                       {nomeMes(p.mes)}
-                      {p.mes === mesHoje && <span className="font-normal text-ink-3"> · hoje</span>}
+                      {p.mes === mesHoje && (
+                        <span className="font-normal text-ink-3"> · hoje</span>
+                      )}
                     </td>
-                    <td className="py-2 text-right text-ink-2">{formatar(p.entradas)}</td>
-                    <td className="py-2 text-right text-ink-2">{formatar(p.parteCasa)}</td>
-                    <td className="py-2 text-right text-ink-2">{formatar(p.pessoais)}</td>
-                    <td className="py-2 text-right text-ink-2">{formatar(p.diaADia)}</td>
+                    <td className="py-2 text-right text-ink-2">
+                      {formatar(p.entradas)}
+                    </td>
+                    <td className="py-2 text-right text-ink-2">
+                      {formatar(p.parteCasa)}
+                    </td>
+                    <td className="py-2 text-right text-ink-2">
+                      {formatar(p.pessoais)}
+                    </td>
+                    <td className="py-2 text-right text-ink-2">
+                      {formatar(p.diaADia)}
+                    </td>
                     <td
                       className={cx(
                         "rounded-r-lg py-2 pr-2 text-right font-semibold",
@@ -167,8 +210,8 @@ export default function PaginaFluxo() {
             </table>
           </div>
           <p className="mt-4 text-xs leading-5 text-ink-3">
-            Cada mês usa o salário que valia na época (veja o histórico em Minha renda) e os valores
-            reais que você informou nas contas.
+            Cada mês usa o salário que valia na época (veja o histórico em Minha
+            renda) e os valores reais que você informou nas contas.
           </p>
         </Painel>
 
@@ -184,7 +227,9 @@ export default function PaginaFluxo() {
           </ul>
           <p className="mt-6 text-xs font-semibold text-ink">Saídas</p>
           <ul>
-            {lar && <LinhaDetalhe nome="Sua parte da casa" valor={r.parteCasa} />}
+            {lar && (
+              <LinhaDetalhe nome="Sua parte da casa" valor={r.parteCasa} />
+            )}
             {r.itensPessoais.map((i) => (
               <LinhaDetalhe
                 key={i.chave}
