@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
@@ -50,6 +50,16 @@ export default function PaginaTransacoes() {
   const { dados, mes, setMes, hoje } = useApp();
   const perfil = usePerfil();
   const { abrir } = useModais();
+
+  // Atalho "Nova transação" do ícone do app (…/transacoes/?nova=1): já abre o formulário.
+  useEffect(() => {
+    const busca = new URLSearchParams(window.location.search);
+    if (!busca.has("nova")) return;
+    busca.delete("nova");
+    const resto = busca.toString();
+    window.history.replaceState(null, "", window.location.pathname + (resto ? `?${resto}` : ""));
+    abrir({ tipo: "transacao" });
+  }, [abrir]);
   const [aba, setAba] = useState<"extrato" | "categoria">("extrato");
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<Filtro>("todas");

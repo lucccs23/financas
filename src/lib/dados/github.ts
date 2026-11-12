@@ -176,6 +176,44 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
 
 /* ───────────────────────── Guardado neste aparelho ───────────────────────── */
 
+/** Cópia dos dados no aparelho, para abrir na hora e funcionar sem internet. */
+const COPIA_NO_APARELHO = "financas-dados";
+const enderecoDaCopia = (repositorio: string) => `/copia/${encodeURIComponent(repositorio)}.json`;
+
+async function guardarCopia(repositorio: string, banco: Dados) {
+  try {
+    if (typeof caches === "undefined") return;
+    const guardado = await caches.open(COPIA_NO_APARELHO);
+    await guardado.put(
+      enderecoDaCopia(repositorio),
+      new Response(JSON.stringify(banco), { headers: { "content-type": "application/json" } }),
+    );
+  } catch {
+    // Sem espaço ou sem permissão: o app só não abre tão rápido.
+  }
+}
+
+async function lerCopia(repositorio: string): Promise<Dados | null> {
+  try {
+    if (typeof caches === "undefined") return null;
+    const guardado = await caches.open(COPIA_NO_APARELHO);
+    const resposta = await guardado.match(enderecoDaCopia(repositorio));
+    return resposta ? op.normalizar((await resposta.json()) as Partial<Dados>) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function apagarCopia(repositorio: string) {
+  try {
+    if (typeof caches !== "undefined") {
+      await (await caches.open(COPIA_NO_APARELHO)).delete(enderecoDaCopia(repositorio));
+    }
+  } catch {
+    // nada a fazer
+  }
+}
+
 function ler(chave: string): string | null {
   try {
     return localStorage.getItem(chave);
@@ -217,7 +255,11 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
   }
 
   async function obter(novo: boolean): Promise<Lido> {
-    if (!cache || novo) cache = await arquivo().ler();
+    if (!cache || novo) {
+      cache = await arquivo().ler();
+      const repo = lerConexao()?.repositorio;
+      if (repo) void guardarCopia(repo, cache.banco);
+    }
     return cache;
   }
 
@@ -283,6 +325,8 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
       try {
         const sha = await arquivo().gravar(banco, atual.sha, mensagem);
         cache = { banco, sha };
+        const repo = lerConexao()?.repositorio;
+        if (repo) void guardarCopia(repo, banco);
         for (const v of validos) v.pedido.ok(v.resultado);
         return;
       } catch (e) {
@@ -319,6 +363,8 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
         localStorage.setItem(CHAVE_CONEXAO, JSON.stringify(conexao));
       },
       async desconectar() {
+        const repo = lerConexao()?.repositorio;
+        if (repo) await apagarCopia(repo);
         cache = null;
         localStorage.removeItem(CHAVE_CONEXAO);
         localStorage.removeItem(CHAVE_SESSAO);
@@ -356,6 +402,13 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
       const id = exigirSessao();
       const { banco } = await obter(true);
       return op.recortar(banco, id);
+    },
+    async carregarDoAparelho() {
+      const id = ler(CHAVE_SESSAO);
+      const repo = lerConexao()?.repositorio;
+      if (!id || !repo) return null;
+      const banco = await lerCopia(repo);
+      return banco ? op.recortar(banco, id) : null;
     },
     async inserir<K extends NomeTabela>(tabela: K, linha: Linha<K>) {
       await alterar(`Adiciona em ${tabela}`, (b) => op.inserir(b, tabela, linha));

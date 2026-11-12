@@ -16,6 +16,28 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#f1f2f5",
     theme_color: "#2563eb",
     lang: "pt-BR",
+    // Segurando o ícone do app no Android aparecem estes atalhos.
+    shortcuts: [
+      {
+        name: "Nova transação",
+        short_name: "Lançar",
+        description: "Lançar um gasto ou uma entrada",
+        url: `${base}/transacoes/?nova=1`,
+        icons: [{ src: `${base}/icone-192.png`, sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Transações",
+        short_name: "Extrato",
+        url: `${base}/transacoes/`,
+        icons: [{ src: `${base}/icone-192.png`, sizes: "192x192", type: "image/png" }],
+      },
+      {
+        name: "Cartões",
+        short_name: "Cartões",
+        url: `${base}/cartoes/`,
+        icons: [{ src: `${base}/icone-192.png`, sizes: "192x192", type: "image/png" }],
+      },
+    ],
     icons: [
       { src: `${base}/icone-192.png`, sizes: "192x192", type: "image/png", purpose: "any" },
       { src: `${base}/icone-512.png`, sizes: "512x512", type: "image/png", purpose: "any" },

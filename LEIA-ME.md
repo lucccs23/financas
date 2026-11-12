@@ -214,6 +214,28 @@ O resultado fica na pasta `.next-online`.
 com login por e-mail, em vez do repositório dos dados. Em **Authentication >
 URL Configuration**, coloque o endereço do site em **Site URL**.
 
+### Usar como aplicativo
+
+**No celular (Android, Chrome):** abra o endereço do site, toque nos três pontos
+e em **Adicionar à tela inicial** (ou **Instalar app**). Ele ganha ícone, abre em
+tela cheia e:
+
+- **abre na hora**: o app e a última cópia dos dados ficam guardados no
+  celular; a versão nova chega do GitHub em segundo plano;
+- **funciona sem internet** para consultar (para lançar, precisa de conexão);
+- **atalhos no ícone**: segure o ícone para ir direto a **Nova transação**,
+  **Transações** ou **Cartões**;
+- **botão +** no canto da tela, para lançar um gasto de qualquer lugar.
+
+Uma atualização do site aparece na segunda vez que o app é aberto depois dela.
+
+**No computador (Chrome):** abra o endereço do site e clique no ícone de
+instalar, na barra de endereço (ou nos três pontos > **Transmitir, salvar e
+compartilhar > Instalar página como app**). O Finanças vira um programa, com
+ícone no menu Iniciar e janela própria, usando os dados online. Para fixar na
+barra de tarefas, clique com o botão direito no ícone dele aberto e escolha
+**Fixar na barra de tarefas**.
+
 ## Open Finance (bancos automáticos, pelo Meu Pluggy)
 
 Com o site no GitHub, o app pode buscar sozinho as contas, cartões e

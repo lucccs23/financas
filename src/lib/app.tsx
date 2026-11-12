@@ -141,6 +141,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const preparado = useRef(false);
+  /** Conta as mudanças feitas na tela (para não apagá-las com dados mais velhos). */
+  const mexidas = useRef(0);
   const iniciar = useCallback(async () => {
     try {
       if (!preparado.current) {
@@ -154,14 +156,42 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setEstado("deslogado");
         return;
       }
-      const d = await backend.carregar();
-      setDados(d);
+      // Abre na hora com a cópia guardada no aparelho (quando houver) e
+      // atualiza assim que a versão do GitHub chegar.
+      const guardado = await backend.carregarDoAparelho?.().catch(() => null);
+      const abriuGuardado = !!guardado?.perfis.some((p) => p.id === s.userId);
+      if (abriuGuardado) {
+        setDados(guardado!);
+        setEstado("pronto");
+      }
+      const mexidasAntes = mexidas.current;
+      let d: Dados;
+      try {
+        d = await backend.carregar();
+      } catch (e) {
+        if (abriuGuardado) {
+          // O motivo (sem internet, chave vencida...) e o que está na tela.
+          avisar(`${mensagem(e)} Mostrando os dados guardados neste aparelho.`, "erro");
+          return;
+        }
+        throw e;
+      }
+      // Se a pessoa já mexeu em algo enquanto a versão nova vinha, a tela
+      // dela vale; a próxima busca (ao voltar para o app) junta tudo.
+      if (!abriuGuardado || mexidas.current === mexidasAntes) setDados(d);
       setEstado(d.perfis.some((p) => p.id === s.userId) ? "pronto" : "semPerfil");
     } catch (e) {
       avisar(mensagem(e), "erro");
       setEstado("deslogado");
     }
   }, [backend, avisar]);
+
+  // Versão online: guarda o app no aparelho para abrir na hora (public/sw.js).
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_MODO || !("serviceWorker" in navigator)) return;
+    const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+    navigator.serviceWorker.register(`${base}/sw.js`, { scope: `${base}/` }).catch(() => undefined);
+  }, []);
 
   const recarregar = useCallback(async () => {
     try {
@@ -286,6 +316,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const inserir = useCallback(
     async <K extends NomeTabela>(tabela: K, linha: Linha<K>) => {
+      mexidas.current++;
       setDados((d) => ({ ...d, [tabela]: [...d[tabela], linha] }));
       await gravar(() => backend.inserir(tabela, linha));
     },
@@ -294,6 +325,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const atualizar = useCallback(
     async <K extends NomeTabela>(tabela: K, id: Id, mudancas: Partial<Linha<K>>) => {
+      mexidas.current++;
       setDados((d) => ({
         ...d,
         [tabela]: (d[tabela] as Linha<K>[]).map((x) => (x.id === id ? { ...x, ...mudancas } : x)),
@@ -305,6 +337,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const remover = useCallback(
     async (tabela: NomeTabela, id: Id) => {
+      mexidas.current++;
       setDados((d) => ({
         ...d,
         [tabela]: (d[tabela] as { id: Id }[]).filter((x) => x.id !== id),

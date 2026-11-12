@@ -196,12 +196,14 @@ function Estrutura({ children }: { children: ReactNode }) {
         <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
           <BarraLateral />
         </aside>
-        <div className="min-w-0 flex-1 pb-24 lg:pb-0">
+        {/* No celular, espaço para a barra de baixo e para o botão de lançar. */}
+      <div className="min-w-0 flex-1 pb-40 lg:pb-0">
           <Cabecalho abrirGaveta={() => setGaveta(true)} />
           <main className="mt-4 sm:mt-6">{children}</main>
         </div>
 
         <NavInferior />
+      <BotaoLancar />
 
         {gaveta && (
           <div className="fixed inset-0 z-40 lg:hidden">
@@ -773,6 +775,22 @@ function Adicionar() {
 }
 
 /* ───────────────────────── Celular e avisos ───────────────────────── */
+
+/** Celular: lançar um gasto com um toque, de qualquer tela. */
+function BotaoLancar() {
+  const { abrir } = useModais();
+  return (
+    <button
+      type="button"
+      aria-label="Nova transação"
+      title="Nova transação"
+      onClick={() => abrir({ tipo: "transacao" })}
+      className="fixed right-4 bottom-[calc(80px+env(safe-area-inset-bottom))] z-30 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-primary-ink shadow-pop transition-transform active:scale-95 lg:hidden"
+    >
+      <Plus size={24} strokeWidth={2.4} />
+    </button>
+  );
+}
 
 function NavInferior() {
   const caminho = usePathname();

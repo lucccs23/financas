@@ -63,6 +63,11 @@ export interface Backend {
 
   /** Tudo o que a pessoa logada pode ver: o que é dela e o que é do lar dela. */
   carregar(): Promise<Dados>;
+  /**
+   * O mesmo, mas da última cópia guardada neste aparelho (sem internet, na
+   * hora). null quando não há cópia. O app abre com ela e atualiza depois.
+   */
+  carregarDoAparelho?(): Promise<Dados | null>;
   inserir<K extends NomeTabela>(tabela: K, linha: Linha<K>): Promise<void>;
   atualizar<K extends NomeTabela>(tabela: K, id: Id, mudancas: Partial<Linha<K>>): Promise<void>;
   remover(tabela: NomeTabela, id: Id): Promise<void>;
