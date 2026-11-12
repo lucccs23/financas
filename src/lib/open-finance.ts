@@ -760,12 +760,26 @@ export function deslocamentoDoRotulo(
       data(t.date) <= hoje,
   );
   if (!aVista.length) return 0;
-  const maisRecente = aVista.reduce((a, b) =>
-    data(b.date) > data(a.date) ? b : a,
-  );
-  const rotulo = maisRecente.creditCardMetadata!.billForecastDate!;
   // Vencimento da fatura aberta hoje, pelas regras do cartão no app.
   const vencimento = mesPrimeiraFatura(cartao, hoje);
+  // O rótulo que mais aparece nas compras do ciclo aberto. Uma cobrança só
+  // pode vir com rótulo diferente (o Inter põe o seguro do cartão, lançado no
+  // dia do vencimento, na fatura seguinte) e não pode mudar o cartão inteiro.
+  const doCiclo = aVista.filter(
+    (t) => mesPrimeiraFatura(cartao, data(t.date)) === vencimento,
+  );
+  const base = doCiclo.length ? doCiclo : aVista;
+  const contagem = new Map<string, { vezes: number; ultima: string }>();
+  for (const t of base) {
+    const r = t.creditCardMetadata!.billForecastDate!;
+    const c = contagem.get(r) ?? { vezes: 0, ultima: "" };
+    c.vezes++;
+    if (data(t.date) > c.ultima) c.ultima = data(t.date);
+    contagem.set(r, c);
+  }
+  const [rotulo] = [...contagem].sort(
+    (a, b) => b[1].vezes - a[1].vezes || b[1].ultima.localeCompare(a[1].ultima),
+  )[0];
   return diffMeses(rotulo, vencimento);
 }
 

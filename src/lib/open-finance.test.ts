@@ -5,6 +5,7 @@ import {
   aplicarOpenFinance,
   buscaParada,
   categoriaDaPluggy,
+  deslocamentoDoRotulo,
   emReais,
   paraVoceMesmo,
   saldoNaoPago,
@@ -1036,5 +1037,35 @@ describe("fatura: moeda e saldo anterior", () => {
         "2026-11-12",
       ),
     ).toBeNull();
+  });
+});
+
+describe("rótulo da fatura por cartão", () => {
+  const compra = (dia: string, rotulo: string) => ({
+    id: dia + rotulo,
+    date: dia,
+    description: "Loja",
+    amount: 10,
+    type: "DEBIT" as const,
+    creditCardMetadata: { billForecastDate: rotulo },
+  });
+  it("uma cobrança com rótulo diferente (seguro do Inter) não muda o cartão inteiro", () => {
+    const inter = { diaFechamento: 30, diaVencimento: 7 };
+    const t = [
+      compra("2026-11-01", "2026-11"),
+      compra("2026-11-02", "2026-11"),
+      compra("2026-11-04", "2026-11"),
+      compra("2026-11-07", "2026-12"), // seguro, no dia do vencimento
+    ];
+    // Fatura aberta vence em dezembro: o rótulo "2026-11" do Inter é um mês antes.
+    expect(deslocamentoDoRotulo(t, inter, "2026-11-12")).toBe(1);
+  });
+  it("Nubank: o rótulo já é o mês do vencimento", () => {
+    const nubank = { diaFechamento: 30, diaVencimento: 9 };
+    const t = [
+      compra("2026-11-01", "2026-12"),
+      compra("2026-11-10", "2026-12"),
+    ];
+    expect(deslocamentoDoRotulo(t, nubank, "2026-11-12")).toBe(0);
   });
 });
