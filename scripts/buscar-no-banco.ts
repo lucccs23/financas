@@ -18,6 +18,7 @@ import {
   aplicarOpenFinance,
   type ConexaoBuscada,
   type ContaPluggy,
+  nomeDoBanco,
   type StatusOpenFinance,
   type TransacaoPluggy,
 } from "../src/lib/open-finance";
@@ -30,6 +31,8 @@ const DIAS = 90;
 export interface ConexaoNoCache {
   item: string;
   perfil: string;
+  /** Nome do banco escrito na configuração (opcional). */
+  apelido?: string;
   banco: string;
   situacao: StatusOpenFinance["conexoes"][number]["situacao"];
   atualizadoNoBancoEm: string | null;
@@ -37,15 +40,20 @@ export interface ConexaoNoCache {
   contas: { conta: ContaPluggy; transacoes: TransacaoPluggy[] }[];
 }
 
-/** "id = Nome" por linha (ou separado por vírgula). Sem nome: o perfil único do app. */
-export function lerConfiguracao(texto: string): { item: string; perfil: string }[] {
+/**
+ * "id = Perfil" por linha (ou separado por vírgula). Opcional: "id = Perfil = Banco"
+ * para dar nome ao banco. Sem perfil: o perfil único do app.
+ */
+export function lerConfiguracao(
+  texto: string,
+): { item: string; perfil: string; apelido: string }[] {
   return texto
     .split(/[\n,;]+/)
     .map((linha) => linha.trim())
     .filter((linha) => linha && !linha.startsWith("#"))
     .map((linha) => {
-      const [item, ...resto] = linha.split(/[=:]/);
-      return { item: item.trim(), perfil: resto.join("=").trim() };
+      const [item, perfil = "", apelido = ""] = linha.split(/[=:]/).map((p) => p.trim());
+      return { item, perfil, apelido };
     })
     .filter((c) => /^[0-9a-f-]{20,}$/i.test(c.item));
 }
@@ -89,10 +97,11 @@ async function buscar(cache: string) {
   const desde = new Date(Date.now() - DIAS * 86_400_000).toISOString().slice(0, 10);
   const conexoes: ConexaoNoCache[] = [];
 
-  for (const { item, perfil } of config) {
+  for (const { item, perfil, apelido } of config) {
     const conexao: ConexaoNoCache = {
       item,
       perfil,
+      apelido,
       banco: "Banco",
       situacao: "erro",
       atualizadoNoBancoEm: null,
@@ -106,7 +115,7 @@ async function buscar(cache: string) {
         lastUpdatedAt?: string | null;
         connector?: { name?: string };
       }>(apiKey, `/items/${item}`);
-      conexao.banco = dados.connector?.name?.replace(/^MeuPluggy\s*[-–:]?\s*/i, "") || "Banco";
+      const conector = dados.connector?.name?.replace(/^\s*meu\s*pluggy\s*[-–:]?\s*/i, "").trim();
       conexao.situacao = situacaoDoItem(dados.status);
       conexao.atualizadoNoBancoEm = dados.lastUpdatedAt ?? null;
 
@@ -127,6 +136,8 @@ async function buscar(cache: string) {
         }
         conexao.contas.push({ conta, transacoes });
       }
+      conexao.banco =
+        apelido || nomeDoBanco(contas) || conector || contas[0]?.marketingName?.trim() || "Banco";
       console.log(
         `Conexão ${conexoes.length}: ${conexao.contas.length} conta(s), ` +
           `${conexao.contas.reduce((s, c) => s + c.transacoes.length, 0)} movimentação(ões).`,

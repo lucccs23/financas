@@ -4,6 +4,7 @@ import { saldoCarteira } from "./calc-extra";
 import {
   aplicarOpenFinance,
   categoriaDaPluggy,
+  nomeDoBanco,
   semParcela,
   type ConexaoBuscada,
   type ContaPluggy,
@@ -217,6 +218,25 @@ describe("Open Finance", () => {
     expect(limiteDoCartao(k, d, "2026-11").livre).toBe(410_000);
     expect(k.limiteConferidoEm).toBe(HOJE);
     expect(faturaDoMes(k.id, d.compras, "2026-11")).toBeGreaterThan(0);
+  });
+
+  it("descobre o nome do banco e troca nomes genéricos (mas não os que você escolheu)", () => {
+    expect(nomeDoBanco([{ name: "Conta", bankData: { transferNumber: "077/0001/1234-5" } }])).toBe("Inter");
+    expect(
+      nomeDoBanco([{ name: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" }]),
+    ).toBe("Nubank");
+    expect(nomeDoBanco([{ name: "portobank" }])).toBe("Porto Bank");
+    expect(nomeDoBanco([{ name: "Conta corrente", bankData: { transferNumber: "0001/123-4" } }])).toBeNull();
+
+    const d = base();
+    const generica = { ...corrente, name: "Nu Pagamentos S.A. (Conta Pré-paga)" };
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Banco", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    expect(d.carteiras[0].nome).toBe("Banco");
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    expect(d.carteiras[0].nome).toBe("Nubank");
+    d.carteiras[0].nome = "Minha conta";
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    expect(d.carteiras[0].nome).toBe("Minha conta");
   });
 
   it("traduz categorias e limpa a parcela da descrição", () => {

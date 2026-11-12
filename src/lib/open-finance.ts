@@ -37,6 +37,8 @@ export interface ContaPluggy {
   name: string;
   marketingName?: string | null;
   balance: number;
+  /** transferNumber costuma vir como "código do banco/agência/conta" (ex.: "077/0001/123-4"). */
+  bankData?: { transferNumber?: string | null } | null;
   creditData?: {
     creditLimit?: number | null;
     availableCreditLimit?: number | null;
@@ -93,6 +95,74 @@ export interface StatusOpenFinance {
     erro: string | null;
   }[];
   importado: ResumoImportacao | null;
+}
+
+/* ───────────────────────── Nome do banco ───────────────────────── */
+
+/** Código do banco (COMPE) → nome curto. */
+const CODIGOS: Record<string, string> = {
+  "001": "Banco do Brasil",
+  "033": "Santander",
+  "077": "Inter",
+  "102": "XP",
+  "104": "Caixa",
+  "197": "Stone",
+  "208": "BTG",
+  "212": "Original",
+  "237": "Bradesco",
+  "260": "Nubank",
+  "280": "Will Bank",
+  "290": "PagBank",
+  "323": "Mercado Pago",
+  "335": "Digio",
+  "336": "C6 Bank",
+  "341": "Itaú",
+  "380": "PicPay",
+  "403": "Cora",
+  "655": "BV",
+  "735": "Neon",
+  "748": "Sicredi",
+  "756": "Sicoob",
+};
+
+const NOMES: [RegExp, string][] = [
+  [/\bnu ?(pagamentos|bank)\b|nubank/, "Nubank"],
+  [/mercado ?pago/, "Mercado Pago"],
+  [/porto ?bank|portobank|porto seguro/, "Porto Bank"],
+  [/banco inter|\binter\b/, "Inter"],
+  [/itau/, "Itaú"],
+  [/bradesco/, "Bradesco"],
+  [/santander/, "Santander"],
+  [/caixa/, "Caixa"],
+  [/banco do brasil/, "Banco do Brasil"],
+  [/\bc6\b/, "C6 Bank"],
+  [/picpay/, "PicPay"],
+  [/\bbtg\b/, "BTG"],
+  [/\bxp\b/, "XP"],
+  [/sicoob/, "Sicoob"],
+  [/sicredi/, "Sicredi"],
+  [/pagbank|pagseguro/, "PagBank"],
+  [/\bneon\b/, "Neon"],
+  [/will ?bank/, "Will Bank"],
+  [/digio/, "Digio"],
+  [/recargapay/, "RecargaPay"],
+];
+
+/**
+ * Descobre o nome do banco de uma conexão pelas contas dela: primeiro pelo
+ * código do banco no número de transferência, depois pelo nome da conta.
+ */
+export function nomeDoBanco(contas: Pick<ContaPluggy, "name" | "marketingName" | "bankData">[]) {
+  for (const c of contas) {
+    const codigo = c.bankData?.transferNumber?.match(/^\s*(\d{1,3})\s*[/-]/)?.[1];
+    if (codigo && CODIGOS[codigo.padStart(3, "0")]) return CODIGOS[codigo.padStart(3, "0")];
+  }
+  for (const c of contas) {
+    const texto = normalizar(`${c.marketingName ?? ""} ${c.name ?? ""}`);
+    const achado = NOMES.find(([r]) => r.test(texto))?.[1];
+    if (achado) return achado;
+  }
+  return null;
 }
 
 /* ───────────────────────── Ajudantes ───────────────────────── */
@@ -225,15 +295,25 @@ function aplicarConta(
   resumo: ResumoImportacao,
 ) {
   const { perfilId } = conexao;
+  const poupanca = conta.subtype === "SAVINGS_ACCOUNT";
+  const nomeBom = `${conexao.banco}${poupanca ? " · Poupança" : ""}`;
   let carteira = banco.carteiras.find((c) => c.externoId === conta.id);
+  // Nome genérico que veio de uma busca anterior: troca pelo nome do banco.
+  // Um nome que você mesmo escolheu fica como está.
+  if (
+    carteira &&
+    conexao.banco !== "Banco" &&
+    [conta.marketingName?.trim(), conta.name?.trim(), "Banco", "Banco · Poupança"].includes(
+      carteira.nome,
+    )
+  ) {
+    carteira.nome = nomeBom;
+  }
   if (!carteira) {
-    const poupanca = conta.subtype === "SAVINGS_ACCOUNT";
     carteira = {
       id: novoId(),
       perfilId,
-      nome:
-        conta.marketingName?.trim() ||
-        `${conexao.banco}${poupanca ? " · Poupança" : ""}`,
+      nome: nomeBom,
       tipo: poupanca ? "poupanca" : "corrente",
       saldoInicial: 0,
       cor: banco.carteiras.filter((c) => c.perfilId === perfilId).length % 6,
@@ -346,6 +426,9 @@ function aplicarCartao(
     banco.cartoes.push(cartao);
     resumo.cartoesNovos++;
   } else {
+    if ((!cartao.banco || cartao.banco === "Banco") && conexao.banco !== "Banco") {
+      cartao.banco = conexao.banco;
+    }
     if (credito.creditLimit != null) cartao.limite = centavos(credito.creditLimit);
     if (fechamento) cartao.diaFechamento = fechamento;
     if (vencimento) cartao.diaVencimento = vencimento;

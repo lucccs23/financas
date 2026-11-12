@@ -6,7 +6,8 @@
 #
 # Precisa, em Settings > Secrets and variables > Actions:
 #   Secrets:   PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET
-#   Variables: PLUGGY_CONEXOES  (uma por linha: "<id da conexão> = <nome do perfil>")
+#   Variables: (opcionais)
+#   PLUGGY_CONEXOES (variable ou secret; uma por linha: "<id da conexão> = <nome do perfil>")
 #              APP_REPO         (opcional; padrão: <seu usuário>/financas)
 name: Buscar no banco
 
@@ -50,7 +51,7 @@ jobs:
         env:
           PLUGGY_CLIENT_ID: ${{ secrets.PLUGGY_CLIENT_ID }}
           PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
-          PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES }}
+          PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES || secrets.PLUGGY_CONEXOES }}
         run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
       - name: Gravar nos dados
         working-directory: dados
