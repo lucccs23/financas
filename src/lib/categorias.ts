@@ -58,6 +58,7 @@ export const CATEGORIAS: Categoria[] = [
 const EXTRAS: Record<string, Categoria> = {
   cartao: { id: "cartao", nome: "Cartão", icone: CreditCard },
   renda: { id: "renda", nome: "Renda extra", icone: Banknote },
+  salario: { id: "salario", nome: "Salário", icone: Banknote },
   "dia-a-dia": { id: "dia-a-dia", nome: "Reservado p/ dia a dia", icone: Coffee },
   reembolso: { id: "reembolso", nome: "Reembolso", icone: Banknote },
   presente: { id: "presente", nome: "Presente", icone: Gift },

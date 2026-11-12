@@ -9,6 +9,7 @@ import { registrarRenda, rendaNoMes } from "@/lib/calc";
 import type { Dados, Mes } from "@/lib/types";
 import { SeletorMes } from "@/components/formularios-contas";
 import { useModais } from "@/components/modais-contexto";
+import { LimitesCategoria } from "@/components/limites";
 import {
   Alternar,
   Botao,
@@ -268,6 +269,8 @@ export default function PaginaRenda() {
             </>
           )}
         </Painel>
+
+        <LimitesCategoria />
 
         {modo === "computador" && <AbrirNoCelular />}
       </div>

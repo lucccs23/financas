@@ -29,6 +29,7 @@ import {
 } from "./ui";
 
 const CATEGORIAS_ENTRADA = [
+  { id: "salario", nome: "Salário" },
   { id: "renda", nome: "Renda extra" },
   { id: "reembolso", nome: "Reembolso" },
   { id: "presente", nome: "Presente" },

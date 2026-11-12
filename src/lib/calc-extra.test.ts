@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import { gastosPorCategoria, resumoPessoal } from "./calc";
 import {
   lancamentosDaCategoria,
+  limitesDoMes,
+  salarioDiferente,
+  salarioRecebido,
   agruparPorDia,
   composicaoFatura,
   dicasDoMes,
@@ -161,6 +164,33 @@ describe("resultado, recorrentes e fatura", () => {
     );
     expect(c).toMatchObject({ parcelas: R(140), avulsas: R(50), novas: R(90), herdadas: R(100), total: R(190) });
   });
+  it("salário que caiu na conta e se é diferente do cadastrado", () => {
+    const d = base();
+    d.transacoes = [
+      t({ tipo: "entrada", categoria: "salario", valor: R(4238), data: `${MES}-05` }),
+      t({ tipo: "entrada", categoria: "renda", valor: R(50), data: `${MES}-06` }),
+    ];
+    expect(salarioRecebido(d, "eu", MES)).toBe(R(4238));
+    expect(salarioDiferente(R(4238), R(1000))).toBe(true);
+    expect(salarioDiferente(R(1005), R(1000))).toBe(false); // até 2% não conta
+    expect(salarioDiferente(0, R(1000))).toBe(false);
+  });
+
+  it("limites por categoria: gasto do mês e quanto passou", () => {
+    const d = base();
+    d.perfis[0].limites = { alimentacao: R(100), lazer: R(500), mercado: 0 };
+    d.transacoes = [
+      t({ valor: R(150), data: `${MES}-03`, categoria: "alimentacao" }),
+      t({ valor: R(100), data: `${MES}-03`, categoria: "lazer" }),
+    ];
+    const l = limitesDoMes(d, "eu", MES);
+    expect(l.map((x) => [x.categoria, x.gasto, x.limite])).toEqual([
+      ["alimentacao", R(150), R(100)],
+      ["lazer", R(100), R(500)],
+    ]);
+    expect(l[0].fracao).toBeGreaterThan(1);
+  });
+
   it("lista o que forma uma categoria: transações, compras do cartão e contas", () => {
     const d = base();
     d.cartoes = [{ id: "k", perfilId: "eu", larId: null, nome: "Gold", banco: "Nubank", cor: 0, limite: 0, diaFechamento: 28, diaVencimento: 5 }];

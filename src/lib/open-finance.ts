@@ -121,6 +121,11 @@ export interface StatusOpenFinance {
   importado: ResumoImportacao | null;
 }
 
+/** A busca automática roda 3 vezes por dia: mais de 12 horas sem rodar é sinal de problema. */
+export function buscaParada(status: Pick<StatusOpenFinance, "buscadoEm">, agora = Date.now()) {
+  return agora - Date.parse(status.buscadoEm) > 12 * 3_600_000;
+}
+
 /* ───────────────────────── Nome do banco ───────────────────────── */
 
 /** Código do banco (COMPE) → nome curto. */
@@ -472,6 +477,25 @@ function aplicarConta(
     if (jaVieram.has(t.id)) {
       // Ficou em "Outros" numa busca anterior: tenta de novo. A sua escolha fica.
       const antiga = banco.transacoes.find((x) => x.externoId === t.id);
+      // Salário que uma versão anterior pôs em "Renda extra".
+      if (
+        antiga &&
+        antiga.tipo === "entrada" &&
+        antiga.categoria === "renda" &&
+        ehSalario(t.category)
+      ) {
+        antiga.categoria = "salario";
+      }
+      // Salário que já conta em Minha renda (cadastrado depois): sai do resumo.
+      if (
+        antiga &&
+        antiga.categoria === "salario" &&
+        !antiga.soSaldo &&
+        rendaNoMes(perfil, antiga.data.slice(0, 7)).salario > 0
+      ) {
+        antiga.soSaldo = true;
+        antiga.observacao ||= "Salário (já está em Minha renda)";
+      }
       if (antiga && !antiga.soSaldo && entreContasDoDono(t, conta)) {
         antiga.soSaldo = true;
         antiga.observacao ||= "Entre contas suas";
@@ -519,7 +543,8 @@ function aplicarConta(
       soSaldo = true;
       observacao = "Entre contas suas";
     }
-    if (tipo === "entrada" && ehSalario(t.category) && rendaNoMes(perfil, mes).salario > 0) {
+    const salario = tipo === "entrada" && ehSalario(t.category);
+    if (salario && rendaNoMes(perfil, mes).salario > 0) {
       soSaldo = true;
       observacao = "Salário (já está em Minha renda)";
     }
@@ -544,7 +569,9 @@ function aplicarConta(
       descricao: t.description.trim(),
       valor,
       tipo,
-      categoria: categoriaDaPluggy(t.category, t.description, tipo, doEstabelecimento(t)),
+      categoria: salario
+        ? "salario"
+        : categoriaDaPluggy(t.category, t.description, tipo, doEstabelecimento(t)),
       carteiraId: carteira.id,
       carteiraDestinoId: null,
       observacao,

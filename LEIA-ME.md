@@ -104,6 +104,11 @@ No modo computador:
   fotos que mostrem o número do cartão.
 - **Aparência:** tema claro, escuro ou automático, seis cores de destaque e texto
   maior. Vale para cada aparelho.
+- **Limites por categoria:** em **Minha renda**, defina quanto quer gastar por
+  mês em cada categoria. A distribuição dos gastos mostra a barra de cada uma e
+  o sino avisa quando passar. Clicar numa categoria mostra o que tem dentro.
+- **Salário que cai na conta** (Open Finance) entra como "Salário"; se vier
+  diferente do cadastrado, o saldo previsto avisa e oferece atualizar.
 - **Menu do seu jeito:** arraste os itens do menu lateral para mudar a ordem
   (inclusive entre "Menu" e "Ajustes"), ou use o botão de organizar, com
   setas, no celular. A ordem fica guardada no aparelho, por perfil, e a barra

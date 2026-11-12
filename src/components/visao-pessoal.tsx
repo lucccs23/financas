@@ -18,9 +18,18 @@ import {
   Wallet,
 } from "lucide-react";
 import { useApp, usePerfil } from "@/lib/app";
-import { itensDoMes, resumoMoradia, resumoPessoal, souPagador } from "@/lib/calc";
+import {
+  itensDoMes,
+  registrarRenda,
+  rendaNoMes,
+  resumoMoradia,
+  resumoPessoal,
+  souPagador,
+} from "@/lib/calc";
+import { salarioDiferente, salarioRecebido } from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { formatar, porcento } from "@/lib/dinheiro";
+import { nomeMes } from "@/lib/meses";
 import { BarraFina, Medidor } from "./graficos";
 import { Ilustracao } from "./ilustracao";
 import { useModais } from "./modais-contexto";
@@ -77,9 +86,39 @@ function ItemLegenda({
 }
 
 export function SaldoPrevisto() {
-  const { dados, mes, lar } = useApp();
+  const { dados, mes, lar, eu, atualizar, avisar } = useApp();
   const perfil = usePerfil();
   const r = useMemo(() => resumoPessoal(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  // Salário que caiu na conta (vindo do banco) diferente do cadastrado.
+  const recebido = useMemo(() => salarioRecebido(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  const vigente = rendaNoMes(perfil, mes);
+  const salarioMudou = salarioDiferente(recebido, vigente.salario);
+  const usarRecebido = async () => {
+    const historico = registrarRenda(perfil, mes, recebido, vigente.diaADia);
+    const atual = rendaNoMes({ ...perfil, historico }, "9999-12");
+    await atualizar("perfis", perfil.id, {
+      salario: atual.salario,
+      orcamentoDiaADia: atual.diaADia,
+      historico,
+    });
+    if (eu && eu.salarioCompartilhado !== null) {
+      await atualizar("moradores", eu.id, { salarioCompartilhado: atual.salario });
+    }
+    // O salário que caiu agora já conta em Minha renda: sai do resumo para não contar duas vezes.
+    await Promise.all(
+      dados.transacoes
+        .filter(
+          (t) =>
+            t.perfilId === perfil.id &&
+            t.tipo === "entrada" &&
+            t.categoria === "salario" &&
+            !t.soSaldo &&
+            t.data.slice(0, 7) >= mes,
+        )
+        .map((t) => atualizar("transacoes", t.id, { soSaldo: true })),
+    );
+    avisar(`Salário de ${formatar(recebido)} a partir de ${nomeMes(mes).toLowerCase()}.`);
+  };
   const fr = (v: number) => (r.renda > 0 ? v / r.renda : null);
   const falta = r.sobra < 0;
 
@@ -189,6 +228,17 @@ export function SaldoPrevisto() {
           fracao={fr(Math.abs(r.sobra))}
         />
       </div>
+      {salarioMudou && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-primary-soft p-4">
+          <p className="min-w-0 flex-1 text-[13px]/5 text-primary-text">
+            Caiu <strong className="font-semibold">{formatar(recebido)}</strong> de salário na conta
+            em {nomeMes(mes).toLowerCase()}; o cadastrado é {formatar(vigente.salario)}.
+          </p>
+          <Botao tamanho="sm" variante="primario" onClick={usarRecebido}>
+            Usar {formatar(recebido, { semCentavos: true })} daqui em diante
+          </Botao>
+        </div>
+      )}
     </Painel>
   );
 }

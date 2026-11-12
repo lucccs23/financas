@@ -294,6 +294,7 @@ export function DistribuicaoGastos() {
   const [foco, setFoco] = useState<string | null>(null);
   // Categoria aberta para ver o que tem dentro.
   const [aberta, setAberta] = useState<string | null>(null);
+  const limites = perfil.limites ?? {};
   const dentro = useMemo(
     () =>
       aberta && aberta !== "_outras" ? lancamentosDaCategoria(dados, perfil.id, mes, aberta) : [],
@@ -443,6 +444,31 @@ export function DistribuicaoGastos() {
                       )}
                     </span>
                   </button>
+                  {(limites[f.id] ?? 0) > 0 && (
+                    <div className="mb-2 flex items-center gap-2 pl-4">
+                      <div className="h-1 flex-1 overflow-hidden rounded-full bg-surface-3">
+                        <div
+                          className={cx(
+                            "h-full rounded-full",
+                            f.valor > limites[f.id]
+                              ? "bg-bad"
+                              : f.valor > limites[f.id] * 0.8
+                                ? "bg-warn"
+                                : "bg-good",
+                          )}
+                          style={{ width: `${Math.min(100, (f.valor / limites[f.id]) * 100)}%` }}
+                        />
+                      </div>
+                      <span
+                        className={cx(
+                          "tabular text-[11px]/4",
+                          f.valor > limites[f.id] ? "text-bad-text" : "text-ink-3",
+                        )}
+                      >
+                        limite {formatar(limites[f.id], { semCentavos: true })}
+                      </span>
+                    </div>
+                  )}
                   {estaAberta && (
                     <ul className="mb-2 ml-4 border-l border-line pl-4">
                       {dentro.slice(0, 6).map((l, i) => (

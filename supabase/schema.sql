@@ -32,7 +32,9 @@ create table public.perfil (
   salario bigint not null default 0,
   orcamento_dia_a_dia bigint not null default 0,
   -- mudanças de renda: [{ "desde": "AAAA-MM", "salario": 0, "diaADia": 0 }]
-  historico jsonb
+  historico jsonb,
+  -- limite de gasto por categoria: { "lazer": 40000, ... } (centavos)
+  limites jsonb
 );
 
 create table public.lar (

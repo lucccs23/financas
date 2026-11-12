@@ -50,6 +50,9 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/app";
 import { alertas } from "@/lib/calc";
+import { limitesDoMes } from "@/lib/calc-extra";
+import { categoria } from "@/lib/categorias";
+import { buscaParada } from "@/lib/open-finance";
 import { formatar } from "@/lib/dinheiro";
 import { addMes, anoDe, nomeMes } from "@/lib/meses";
 import {
@@ -197,13 +200,13 @@ function Estrutura({ children }: { children: ReactNode }) {
           <BarraLateral />
         </aside>
         {/* No celular, espaço para a barra de baixo e para o botão de lançar. */}
-      <div className="min-w-0 flex-1 pb-40 lg:pb-0">
+        <div className="min-w-0 flex-1 pb-40 lg:pb-0">
           <Cabecalho abrirGaveta={() => setGaveta(true)} />
           <main className="mt-4 sm:mt-6">{children}</main>
         </div>
 
         <NavInferior />
-      <BotaoLancar />
+        <BotaoLancar />
 
         {gaveta && (
           <div className="fixed inset-0 z-40 lg:hidden">
@@ -561,13 +564,35 @@ export function prazo(dias: number): string {
 }
 
 function Sino() {
-  const { dados, perfil, hoje, marcarPago } = useApp();
+  const { dados, perfil, hoje, marcarPago, backend } = useApp();
   const [aberto, setAberto] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const lista = useMemo(
     () => (perfil && hoje ? alertas(dados, perfil.id, hoje) : []),
     [dados, perfil, hoje],
   );
+  // Categorias que passaram do limite neste mês.
+  const estourados = useMemo(
+    () =>
+      perfil && hoje
+        ? limitesDoMes(dados, perfil.id, hoje.slice(0, 7)).filter((l) => l.fracao > 1)
+        : [],
+    [dados, perfil, hoje],
+  );
+  // Busca no banco parada há mais de 12 horas (só no modo GitHub).
+  const [parada, setParada] = useState(false);
+  useEffect(() => {
+    const of = backend.openFinance;
+    if (!of) return;
+    let vivo = true;
+    of.status()
+      .then((s) => vivo && setParada(!!s && buscaParada(s)))
+      .catch(() => undefined);
+    return () => {
+      vivo = false;
+    };
+  }, [backend]);
+  const total = lista.length + estourados.length + (parada ? 1 : 0);
 
   useEffect(() => {
     if (!aberto) return;
@@ -587,22 +612,22 @@ function Sino() {
     <div ref={raiz} className="relative">
       <button
         type="button"
-        aria-label={`Avisos de vencimento: ${lista.length}`}
+        aria-label={`Avisos: ${total}`}
         aria-expanded={aberto}
         onClick={() => setAberto((a) => !a)}
         className="relative grid h-10 w-10 place-items-center rounded-lg border border-line bg-surface text-ink-2 shadow-[0_1px_2px_rgba(16,24,40,0.05)] transition-colors hover:bg-surface-2 hover:text-ink"
       >
         <Bell size={20} />
-        {lista.length > 0 && (
+        {total > 0 && (
           <span className="tabular absolute -top-2 -right-2 grid h-4 min-w-4 place-items-center rounded-full bg-bad px-1 text-[10.5px]/4 font-semibold text-white ring-2 ring-surface">
-            {lista.length}
+            {total}
           </span>
         )}
       </button>
       {aberto && (
         <div className="absolute top-[calc(100%+8px)] right-0 z-40 w-88 animate-subir rounded-2xl border border-line bg-surface shadow-pop max-sm:fixed max-sm:inset-x-4 max-sm:top-20 max-sm:w-auto">
           <div className="border-b border-line px-4 py-4">
-            <p className="text-sm font-semibold text-ink">Vencimentos</p>
+            <p className="text-sm font-semibold text-ink">Avisos</p>
             <p className="text-xs text-ink-3">
               Contas que você paga, atrasadas ou dos próximos 5 dias.
             </p>
@@ -648,6 +673,37 @@ function Sino() {
                 </li>
               ))}
             </ul>
+          )}
+          {estourados.length > 0 && (
+            <div className="border-t border-line px-4 py-4">
+              <p className="text-sm font-semibold text-ink">Limites passados</p>
+              <ul className="mt-2 space-y-2">
+                {estourados.map((l) => (
+                  <li key={l.categoria} className="flex items-center gap-2 text-[13px]/5">
+                    <TriangleAlert size={16} className="shrink-0 text-warn-text" />
+                    <span className="min-w-0 flex-1 truncate text-ink-2">
+                      {categoria(l.categoria).nome}
+                    </span>
+                    <span className="tabular text-xs text-ink-3">
+                      {formatar(l.gasto, { semCentavos: true })} de{" "}
+                      {formatar(l.limite, { semCentavos: true })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {parada && (
+            <div className="flex items-start gap-2 border-t border-line px-4 py-4 text-[13px]/5">
+              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warn-text" />
+              <p className="text-ink-2">
+                A busca no banco não roda há mais de 12 horas. Veja em{" "}
+                <Link href="/carteiras" className="font-medium text-primary-text underline">
+                  Carteiras
+                </Link>
+                .
+              </p>
+            </div>
           )}
         </div>
       )}

@@ -14,6 +14,8 @@ export interface Perfil {
   orcamentoDiaADia: number;
   /** Mudanças de renda ao longo do tempo: cada entrada vale do mês "desde" em diante. */
   historico?: MudancaRenda[] | null;
+  /** Quanto quer gastar por mês em cada categoria (centavos). Sem limite: fora daqui. */
+  limites?: Record<string, number> | null;
 }
 
 export interface MudancaRenda {

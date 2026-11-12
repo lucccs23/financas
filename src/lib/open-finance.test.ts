@@ -3,6 +3,7 @@ import { limiteDoCartao, movimentoAvulso, faturaDoMes } from "./calc";
 import { saldoCarteira } from "./calc-extra";
 import {
   aplicarOpenFinance,
+  buscaParada,
   categoriaDaPluggy,
   categoriaDoMcc,
   entreContasDoDono,
@@ -114,6 +115,22 @@ describe("Open Finance", () => {
     const so = (id: string) => d.transacoes.find((t) => t.externoId === id)?.soSaldo;
     expect([so("m1"), so("m2"), so("m3")]).toEqual([true, false, true]);
     expect(movimentoAvulso(d.transacoes, "eu", "2026-11").entradas).toBe(6300);
+  });
+
+  it("salário que cai na conta vai para a categoria Salário", () => {
+    const d = base();
+    aplicarOpenFinance(
+      d,
+      conexao([{ conta: corrente, transacoes: [tx({ id: "sal", amount: 3000, description: "SALARIO", category: "Salary" })] }]),
+      HOJE,
+    );
+    expect(d.transacoes[0]).toMatchObject({ categoria: "salario", soSaldo: true });
+  });
+
+  it("avisa quando a busca automática passa de 12 horas sem rodar", () => {
+    const agora = Date.parse("2026-11-12T20:00:00Z");
+    expect(buscaParada({ buscadoEm: "2026-11-12T10:00:00Z" }, agora)).toBe(false);
+    expect(buscaParada({ buscadoEm: "2026-11-12T07:00:00Z" }, agora)).toBe(true);
   });
 
   it("ignora o que ainda está pendente no banco", () => {

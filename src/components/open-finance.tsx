@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Landmark, RefreshCw } from "lucide-react";
 import { useApp } from "@/lib/app";
-import type { StatusOpenFinance } from "@/lib/open-finance";
+import { buscaParada, type StatusOpenFinance } from "@/lib/open-finance";
 import { Botao, Etiqueta, Painel, TituloPainel, cx } from "./ui";
 
 const SITUACAO = {
@@ -102,6 +102,13 @@ export function PainelOpenFinance() {
           <p className="mt-2 text-[13px]/5 text-ink-3">
             Última busca {quando(status.buscadoEm)}. O app busca sozinho às 7h, 13h e 19h.
           </p>
+          {buscaParada(status) && (
+            <p className="mt-2 text-[13px]/5 text-warn-text">
+              A busca automática não roda há mais de 12 horas. Use &quot;Buscar agora&quot; e, se
+              continuar, confira em Actions, no repositório dos dados no GitHub, se a tarefa
+              &quot;Buscar no banco&quot; está ativa.
+            </p>
+          )}
         </div>
         <Botao onClick={buscar} disabled={buscando}>
           <RefreshCw size={16} className={cx(buscando && "animate-spin")} />

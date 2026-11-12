@@ -344,6 +344,55 @@ export function composicaoFatura(
   };
 }
 
+/** Salário que caiu na conta no mês (transações de entrada na categoria Salário). */
+export function salarioRecebido(dados: Dados, perfilId: Id, mes: Mes): number {
+  return soma(
+    dados.transacoes
+      .filter(
+        (t) =>
+          t.perfilId === perfilId &&
+          t.tipo === "entrada" &&
+          t.categoria === "salario" &&
+          t.data.slice(0, 7) === mes,
+      )
+      .map((t) => t.valor),
+  );
+}
+
+/**
+ * O salário que caiu é diferente do cadastrado em Minha renda? Pequenas
+ * diferenças (até 2% ou R$ 1) não contam.
+ */
+export function salarioDiferente(recebido: number, cadastrado: number): boolean {
+  if (recebido <= 0) return false;
+  const diferenca = Math.abs(recebido - cadastrado);
+  return diferenca > 100 && diferenca > cadastrado * 0.02;
+}
+
+export interface LimiteCategoria {
+  categoria: string;
+  limite: number;
+  gasto: number;
+  /** gasto / limite */
+  fracao: number;
+}
+
+/** Limites de gasto por categoria do mês, com quanto já foi gasto em cada uma. */
+export function limitesDoMes(dados: Dados, perfilId: Id, mes: Mes): LimiteCategoria[] {
+  const perfil = dados.perfis.find((p) => p.id === perfilId);
+  const limites = Object.entries(perfil?.limites ?? {}).filter(([, v]) => v > 0);
+  if (!limites.length) return [];
+  const gastos = new Map(
+    gastosPorCategoria(dados, perfilId, mes).map((g) => [g.categoria, g.valor]),
+  );
+  return limites
+    .map(([categoria, limite]) => {
+      const gasto = gastos.get(categoria) ?? 0;
+      return { categoria, limite, gasto, fracao: gasto / limite };
+    })
+    .sort((a, b) => b.fracao - a.fracao);
+}
+
 export interface LancamentoDaCategoria {
   descricao: string;
   valor: number;
