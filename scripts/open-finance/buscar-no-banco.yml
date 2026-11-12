@@ -16,6 +16,11 @@ on:
     # 7h, 13h e 19h no horário de Brasília
     - cron: "0 10,16,22 * * *"
   workflow_dispatch:
+    inputs:
+      diagnostico:
+        description: "Mostrar no registro o resumo dos cartões (datas e faturas)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -52,6 +57,7 @@ jobs:
           PLUGGY_CLIENT_ID: ${{ secrets.PLUGGY_CLIENT_ID }}
           PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
           PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES || secrets.PLUGGY_CONEXOES }}
+          DIAGNOSTICO: ${{ inputs.diagnostico && '1' || '' }}
         run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
       - name: Gravar nos dados
         working-directory: dados

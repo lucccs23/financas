@@ -142,6 +142,7 @@ async function buscar(cache: string) {
         `Conexão ${conexoes.length}: ${conexao.contas.length} conta(s), ` +
           `${conexao.contas.reduce((s, c) => s + c.transacoes.length, 0)} movimentação(ões).`,
       );
+      if (process.env.DIAGNOSTICO) diagnostico(conexao);
     } catch (e) {
       conexao.situacao = "erro";
       conexao.erro = e instanceof Error ? e.message : "Erro desconhecido.";
@@ -149,6 +150,39 @@ async function buscar(cache: string) {
     }
   }
   writeFileSync(cache, JSON.stringify({ buscadoEm: new Date().toISOString(), conexoes }));
+}
+
+/**
+ * Resumo para conferir cartões com o app do banco (só com DIAGNOSTICO=1): datas
+ * do cartão e, por fatura e situação, quantas compras e quanto somam.
+ */
+function diagnostico(conexao: ConexaoNoCache) {
+  for (const { conta, transacoes } of conexao.contas) {
+    const c = conta.creditData;
+    console.log(
+      `  ${conexao.banco} · ${conta.type}/${conta.subtype} · ${conta.marketingName ?? conta.name}` +
+        (c
+          ? ` · fecha=${c.balanceCloseDate ?? "-"} vence=${c.balanceDueDate ?? "-"}` +
+            ` limite=${c.creditLimit ?? "-"} livre=${c.availableCreditLimit ?? "-"} saldo=${conta.balance}`
+          : ` · saldo=${conta.balance}`),
+    );
+    if (conta.type !== "CREDIT") continue;
+    const grupos = new Map<string, { n: number; soma: number; de: string; ate: string }>();
+    for (const t of transacoes) {
+      const m = t.creditCardMetadata ?? {};
+      const chave = `fatura=${m.billForecastDate ?? "?"} ${t.status ?? "POSTED"} ${t.type}`;
+      const g = grupos.get(chave) ?? { n: 0, soma: 0, de: "9999", ate: "0000" };
+      const dia = String(t.date).slice(0, 10);
+      g.n++;
+      g.soma += t.amount;
+      if (dia < g.de) g.de = dia;
+      if (dia > g.ate) g.ate = dia;
+      grupos.set(chave, g);
+    }
+    for (const [chave, g] of [...grupos].sort()) {
+      console.log(`    ${chave}: ${g.n} · soma=${g.soma.toFixed(2)} · ${g.de}..${g.ate}`);
+    }
+  }
 }
 
 function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
