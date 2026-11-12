@@ -747,39 +747,34 @@ function ehCompra(t: TransacaoPluggy) {
  * pelo mês anterior). O app usa o mês do vencimento. Descobre, pela fatura
  * aberta hoje, quantos meses somar ao rótulo do banco.
  */
+/** Tarifas do próprio banco no cartão (seguro, anuidade, IOF, juros). */
+const TARIFA_DO_CARTAO = /seguro|anuidade|tarifa|\biof\b|juros|encargo|multa/;
+const ehTarifa = (t: TransacaoPluggy) =>
+  TARIFA_DO_CARTAO.test(normalizar(t.description));
+
 export function deslocamentoDoRotulo(
   transacoes: TransacaoPluggy[],
   cartao: Pick<Cartao, "diaFechamento" | "diaVencimento">,
   hoje: string,
 ): number {
+  // Tarifas do próprio banco (seguro do cartão, anuidade, IOF, juros) ficam de
+  // fora: o Inter lança o seguro no dia do vencimento com o rótulo de outra
+  // fatura, e ele não pode mudar o mês de todas as compras do cartão.
   const aVista = transacoes.filter(
     (t) =>
       t.type === "DEBIT" &&
       (t.creditCardMetadata?.installmentNumber ?? 1) <= 1 &&
       ehMes(t.creditCardMetadata?.billForecastDate) &&
-      data(t.date) <= hoje,
+      data(t.date) <= hoje &&
+      !ehTarifa(t),
   );
   if (!aVista.length) return 0;
+  const maisRecente = aVista.reduce((a, b) =>
+    data(b.date) > data(a.date) ? b : a,
+  );
+  const rotulo = maisRecente.creditCardMetadata!.billForecastDate!;
   // Vencimento da fatura aberta hoje, pelas regras do cartão no app.
   const vencimento = mesPrimeiraFatura(cartao, hoje);
-  // O rótulo que mais aparece nas compras do ciclo aberto. Uma cobrança só
-  // pode vir com rótulo diferente (o Inter põe o seguro do cartão, lançado no
-  // dia do vencimento, na fatura seguinte) e não pode mudar o cartão inteiro.
-  const doCiclo = aVista.filter(
-    (t) => mesPrimeiraFatura(cartao, data(t.date)) === vencimento,
-  );
-  const base = doCiclo.length ? doCiclo : aVista;
-  const contagem = new Map<string, { vezes: number; ultima: string }>();
-  for (const t of base) {
-    const r = t.creditCardMetadata!.billForecastDate!;
-    const c = contagem.get(r) ?? { vezes: 0, ultima: "" };
-    c.vezes++;
-    if (data(t.date) > c.ultima) c.ultima = data(t.date);
-    contagem.set(r, c);
-  }
-  const [rotulo] = [...contagem].sort(
-    (a, b) => b[1].vezes - a[1].vezes || b[1].ultima.localeCompare(a[1].ultima),
-  )[0];
   return diffMeses(rotulo, vencimento);
 }
 
@@ -982,7 +977,8 @@ function aplicarCartao(
   const deslocamento = deslocamentoDoRotulo(transacoes, doCartao, hoje);
   const mesDaFatura = (t: TransacaoPluggy) => {
     const rotulo = t.creditCardMetadata?.billForecastDate;
-    return ehMes(rotulo)
+    // Tarifa do banco: pela data e o fechamento (o rótulo dela pode vir trocado).
+    return ehMes(rotulo) && !ehTarifa(t)
       ? addMes(rotulo, deslocamento)
       : mesPrimeiraFatura(doCartao, data(t.date));
   };

@@ -1050,12 +1050,12 @@ describe("rótulo da fatura por cartão", () => {
     creditCardMetadata: { billForecastDate: rotulo },
   });
   it("uma cobrança com rótulo diferente (seguro do Inter) não muda o cartão inteiro", () => {
-    const inter = { diaFechamento: 30, diaVencimento: 7 };
+    const inter = { diaFechamento: 4, diaVencimento: 7 };
     const t = [
       compra("2026-11-01", "2026-11"),
       compra("2026-11-02", "2026-11"),
       compra("2026-11-04", "2026-11"),
-      compra("2026-11-07", "2026-12"), // seguro, no dia do vencimento
+      { ...compra("2026-11-07", "2026-12"), description: "SEGURO CARTAO CTP" }, // no dia do vencimento
     ];
     // Fatura aberta vence em dezembro: o rótulo "2026-11" do Inter é um mês antes.
     expect(deslocamentoDoRotulo(t, inter, "2026-11-12")).toBe(1);
