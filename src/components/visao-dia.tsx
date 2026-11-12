@@ -29,7 +29,15 @@ import {
 } from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { compacto, formatar, porcento } from "@/lib/dinheiro";
-import { addMes, dataBR, dataISO, intervalo, mesCurto, mesEixo, nomeMes } from "@/lib/meses";
+import {
+  addMes,
+  dataBR,
+  dataISO,
+  intervalo,
+  mesCurto,
+  mesEixo,
+  nomeMes,
+} from "@/lib/meses";
 import { Colunas } from "./graficos";
 import { useModais } from "./modais-contexto";
 import {
@@ -64,7 +72,9 @@ function LinhaDoMes({
   const topo = Math.max(orcamento, gasto, 1) * 1.08;
   const x = (dia: number) => (dia / dias) * L;
   const y = (v: number) => A - (v / topo) * A;
-  const pontos = acumulado.map((v, i) => `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`);
+  const pontos = acumulado.map(
+    (v, i) => `${x(i + 1).toFixed(1)},${y(v).toFixed(1)}`,
+  );
   const ultimo = acumulado.length;
   const acima = gasto > (orcamento * ultimo) / dias;
   const cor = acima ? "var(--warn)" : "var(--good)";
@@ -159,6 +169,20 @@ export function AindaPodeGastar() {
   );
   const dica = dicas[Math.min(indice, dicas.length - 1)];
   const passou = ritmo.restante < 0;
+  // O maior gasto do dia a dia no mês (fora do cartão).
+  const maior = useMemo(
+    () =>
+      (dados.transacoes ?? [])
+        .filter(
+          (t) =>
+            t.perfilId === perfil.id &&
+            t.tipo === "saida" &&
+            !t.soSaldo &&
+            t.data.slice(0, 7) === mes,
+        )
+        .sort((a, b) => b.valor - a.valor)[0] ?? null,
+    [dados.transacoes, perfil.id, mes],
+  );
 
   return (
     <Painel className="flex h-full flex-col overflow-hidden">
@@ -182,29 +206,78 @@ export function AindaPodeGastar() {
         {ritmo.orcamento === 0 ? (
           <div className="mt-4">
             {/* Sem limite definido: mostra o que já foi gasto e convida a definir. */}
-            {ritmo.gasto > 0 && (
+            {ritmo.gasto > 0 ? (
               <>
-                <Valor centavos={ritmo.gasto} className="text-[34px] leading-none" />
-                <p className="mt-2 mb-4 text-[13px]/5 text-ink-3">
-                  gastos no dia a dia em {nomeMes(mes).toLowerCase()}
+                <Valor
+                  centavos={ritmo.gasto}
+                  className="text-[34px] leading-none"
+                />
+                <p className="mt-2 text-[13px]/5 text-ink-3">
+                  gastos no dia a dia em {nomeMes(mes).toLowerCase()} (fora do
+                  cartão)
+                </p>
+                <dl className="mt-6 grid grid-cols-2 gap-4 rounded-lg bg-surface-2 p-4">
+                  <div>
+                    <dt className="text-xs text-ink-3">Média por dia</dt>
+                    <dd className="tabular mt-1 text-[15px]/6 font-semibold text-ink">
+                      {formatar(
+                        Math.round(
+                          ritmo.gasto /
+                            Math.max(1, ritmo.diaAtual || ritmo.diasNoMes),
+                        ),
+                      )}
+                    </dd>
+                  </div>
+                  <div className="min-w-0">
+                    <dt className="text-xs text-ink-3">Maior gasto</dt>
+                    <dd className="tabular mt-1 truncate text-[15px]/6 font-semibold text-ink">
+                      {maior ? formatar(maior.valor) : "—"}
+                    </dd>
+                    {maior && (
+                      <dd
+                        className="truncate text-xs text-ink-3"
+                        title={maior.descricao}
+                      >
+                        {maior.descricao}
+                      </dd>
+                    )}
+                  </div>
+                </dl>
+                <p className="mt-4 text-[13px]/5 text-ink-3">
+                  <Link
+                    href="/renda"
+                    className="font-medium text-primary-text hover:underline"
+                  >
+                    Defina um limite
+                  </Link>{" "}
+                  e o app mostra quanto ainda pode gastar e o ritmo do mês.
                 </p>
               </>
+            ) : (
+              <>
+                <p className="text-[13px] leading-5 text-ink-3">
+                  Defina quanto quer gastar por mês no dia a dia (lanche,
+                  transporte, farmácia) e lance os gastos em Transações para
+                  acompanhar o ritmo.
+                </p>
+                <Link
+                  href="/renda"
+                  className={cx(classesBotao("secundario", "sm"), "mt-4")}
+                >
+                  Definir em Minha renda
+                </Link>
+              </>
             )}
-            <p className="text-[13px] leading-5 text-ink-3">
-              {ritmo.gasto > 0
-                ? "Defina um limite para o dia a dia e o app mostra quanto ainda pode gastar e o ritmo do mês."
-                : "Defina quanto quer gastar por mês no dia a dia (lanche, transporte, farmácia) e lance os gastos em Transações para acompanhar o ritmo."}
-            </p>
-            <Link href="/renda" className={cx(classesBotao("secundario", "sm"), "mt-4")}>
-              Definir em Minha renda
-            </Link>
           </div>
         ) : (
           <>
             <div className="mt-4 flex flex-wrap items-baseline gap-x-2">
               <Valor
                 centavos={Math.abs(ritmo.restante)}
-                className={cx("text-[34px] leading-none", passou && "!text-bad-text")}
+                className={cx(
+                  "text-[34px] leading-none",
+                  passou && "!text-bad-text",
+                )}
               />
               <span className="tabular text-sm text-ink-3">
                 / {formatar(ritmo.orcamento, { semCentavos: true })}
@@ -212,9 +285,11 @@ export function AindaPodeGastar() {
             </div>
             <p className="mt-2 text-[13px]/5 text-ink-3">
               {formatar(ritmo.gasto)} gastos no dia a dia
-              {ritmo.diaAtual > 0 && ritmo.diaAtual < ritmo.diasNoMes && ritmo.porDia > 0 && (
-                <> · até {formatar(ritmo.porDia)} por dia</>
-              )}
+              {ritmo.diaAtual > 0 &&
+                ritmo.diaAtual < ritmo.diasNoMes &&
+                ritmo.porDia > 0 && (
+                  <> · até {formatar(ritmo.porDia)} por dia</>
+                )}
             </p>
             <div className="mt-4">
               <LinhaDoMes
@@ -247,7 +322,10 @@ export function AindaPodeGastar() {
             <Lightbulb size={16} />
             Dica do mês
           </p>
-          <p aria-live="polite" className="mt-2 min-h-[40px] text-[13px] leading-5 text-ink-2">
+          <p
+            aria-live="polite"
+            className="mt-2 min-h-[40px] text-[13px] leading-5 text-ink-2"
+          >
             <TextoDica texto={dica.texto} />
           </p>
           {dicas.length > 1 && (
@@ -256,7 +334,9 @@ export function AindaPodeGastar() {
                 icone={ChevronLeft}
                 rotulo="Dica anterior"
                 tamanho={24}
-                onClick={() => setIndice((i) => (i - 1 + dicas.length) % dicas.length)}
+                onClick={() =>
+                  setIndice((i) => (i - 1 + dicas.length) % dicas.length)
+                }
               />
               {dicas.map((d, i) => (
                 <span
@@ -297,14 +377,19 @@ export function DistribuicaoGastos() {
   const limites = perfil.limites ?? {};
   const dentro = useMemo(
     () =>
-      aberta && aberta !== "_outras" ? lancamentosDaCategoria(dados, perfil.id, mes, aberta) : [],
+      aberta && aberta !== "_outras"
+        ? lancamentosDaCategoria(dados, perfil.id, mes, aberta)
+        : [],
     [aberta, dados, perfil.id, mes],
   );
 
   const { fatias, total } = useMemo(() => {
     const lista = gastosPorCategoria(dados, perfil.id, mes);
     const antes = new Map(
-      gastosPorCategoria(dados, perfil.id, addMes(mes, -1)).map((g) => [g.categoria, g.valor]),
+      gastosPorCategoria(dados, perfil.id, addMes(mes, -1)).map((g) => [
+        g.categoria,
+        g.valor,
+      ]),
     );
     const principais = lista.slice(0, MAX_FATIAS);
     const resto = lista.slice(MAX_FATIAS).reduce((s, g) => s + g.valor, 0);
@@ -320,7 +405,15 @@ export function DistribuicaoGastos() {
         antes: antes.get(g.categoria) ?? 0,
       })),
       ...(resto > 0
-        ? [{ id: "_outras", nome: "Outras categorias", valor: resto, cor: -1, antes: restoAntes }]
+        ? [
+            {
+              id: "_outras",
+              nome: "Outras categorias",
+              valor: resto,
+              cor: -1,
+              antes: restoAntes,
+            },
+          ]
         : []),
     ];
     return { fatias: f, total: lista.reduce((s, g) => s + g.valor, 0) };
@@ -338,7 +431,9 @@ export function DistribuicaoGastos() {
 
   return (
     <Painel className="flex h-full flex-col p-4 sm:p-6">
-      <TituloPainel detalhe={nomeMes(mes).toLowerCase()}>Distribuição dos gastos</TituloPainel>
+      <TituloPainel detalhe={nomeMes(mes).toLowerCase()}>
+        Distribuição dos gastos
+      </TituloPainel>
       {total === 0 ? (
         <div className="grid flex-1 place-items-center">
           <Vazio compacto icone={Receipt} titulo="Nenhum gasto neste mês" />
@@ -350,7 +445,9 @@ export function DistribuicaoGastos() {
               viewBox="0 0 140 140"
               className="h-full w-full -rotate-90"
               role="img"
-              aria-label={fatias.map((f) => `${f.nome} ${porcento(f.valor / total)}`).join(", ")}
+              aria-label={fatias
+                .map((f) => `${f.nome} ${porcento(f.valor / total)}`)
+                .join(", ")}
             >
               <circle
                 cx={70}
@@ -384,7 +481,9 @@ export function DistribuicaoGastos() {
             </svg>
             <div className="pointer-events-none absolute inset-0 grid place-items-center text-center">
               <div>
-                <p className="text-[11px]/4 text-ink-3">{focada ? focada.nome : "Gasto total"}</p>
+                <p className="text-[11px]/4 text-ink-3">
+                  {focada ? focada.nome : "Gasto total"}
+                </p>
                 <p className="tabular text-lg font-semibold tracking-[-0.02em] text-ink">
                   {compacto(focada ? focada.valor : total).replace(/^/, "R$ ")}
                 </p>
@@ -416,13 +515,19 @@ export function DistribuicaoGastos() {
                     type="button"
                     disabled={!podeAbrir}
                     aria-expanded={podeAbrir ? estaAberta : undefined}
-                    title={podeAbrir ? "Ver o que entra nesta categoria" : undefined}
+                    title={
+                      podeAbrir ? "Ver o que entra nesta categoria" : undefined
+                    }
                     onClick={() => setAberta(estaAberta ? null : f.id)}
                     className="flex w-full items-center gap-2 rounded-lg py-2 text-left enabled:cursor-pointer enabled:hover:bg-surface-2"
                   >
                     <Ponto cor={corDe(f.cor)} tamanho={8} />
-                    <span className="min-w-0 flex-1 truncate text-ink">{f.nome}</span>
-                    <span className="tabular text-xs text-ink-3">{porcento(f.valor / total)}</span>
+                    <span className="min-w-0 flex-1 truncate text-ink">
+                      {f.nome}
+                    </span>
+                    <span className="tabular text-xs text-ink-3">
+                      {porcento(f.valor / total)}
+                    </span>
                     <span className="tabular w-22 text-right font-semibold text-ink">
                       {formatar(f.valor, { semCentavos: true })}
                     </span>
@@ -437,10 +542,18 @@ export function DistribuicaoGastos() {
                       }
                     >
                       {subiu && (
-                        <TrendingUp size={16} className="text-warn-text" aria-label="subiu" />
+                        <TrendingUp
+                          size={16}
+                          className="text-warn-text"
+                          aria-label="subiu"
+                        />
                       )}
                       {caiu && (
-                        <TrendingDown size={16} className="text-good-text" aria-label="caiu" />
+                        <TrendingDown
+                          size={16}
+                          className="text-good-text"
+                          aria-label="caiu"
+                        />
                       )}
                     </span>
                   </button>
@@ -456,13 +569,17 @@ export function DistribuicaoGastos() {
                                 ? "bg-warn"
                                 : "bg-good",
                           )}
-                          style={{ width: `${Math.min(100, (f.valor / limites[f.id]) * 100)}%` }}
+                          style={{
+                            width: `${Math.min(100, (f.valor / limites[f.id]) * 100)}%`,
+                          }}
                         />
                       </div>
                       <span
                         className={cx(
                           "tabular text-[11px]/4",
-                          f.valor > limites[f.id] ? "text-bad-text" : "text-ink-3",
+                          f.valor > limites[f.id]
+                            ? "text-bad-text"
+                            : "text-ink-3",
                         )}
                       >
                         limite {formatar(limites[f.id], { semCentavos: true })}
@@ -472,20 +589,29 @@ export function DistribuicaoGastos() {
                   {estaAberta && (
                     <ul className="mb-2 ml-4 border-l border-line pl-4">
                       {dentro.slice(0, 6).map((l, i) => (
-                        <li key={i} className="flex items-center gap-2 py-1 text-xs">
+                        <li
+                          key={i}
+                          className="flex items-center gap-2 py-1 text-xs"
+                        >
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-ink-2">{l.descricao}</span>
+                            <span className="block truncate text-ink-2">
+                              {l.descricao}
+                            </span>
                             <span className="block truncate text-[11px]/4 text-ink-3">
                               {l.origem}
                             </span>
                           </span>
-                          <span className="tabular font-medium text-ink">{formatar(l.valor)}</span>
+                          <span className="tabular font-medium text-ink">
+                            {formatar(l.valor)}
+                          </span>
                         </li>
                       ))}
                       {dentro.length > 6 && (
                         <li className="py-1 text-[11px]/4 text-ink-3">
                           e mais {dentro.length - 6}{" "}
-                          {dentro.length - 6 === 1 ? "lançamento" : "lançamentos"}
+                          {dentro.length - 6 === 1
+                            ? "lançamento"
+                            : "lançamentos"}
                         </li>
                       )}
                       {dentro.length === 0 && (
@@ -519,7 +645,9 @@ export function TransacoesRecentes() {
         .slice(0, 7),
     [dados.transacoes, perfil.id, hoje],
   );
-  const ontem = hoje ? dataISO(new Date(new Date(`${hoje}T12:00:00`).getTime() - 86_400_000)) : "";
+  const ontem = hoje
+    ? dataISO(new Date(new Date(`${hoje}T12:00:00`).getTime() - 86_400_000))
+    : "";
 
   return (
     <Painel className="flex h-full flex-col p-4 sm:p-6">
@@ -540,7 +668,11 @@ export function TransacoesRecentes() {
             titulo="Nenhuma transação ainda"
             texto="Lance um gasto do dia a dia para ele aparecer aqui."
           >
-            <Botao tamanho="sm" variante="primario" onClick={() => abrir({ tipo: "transacao" })}>
+            <Botao
+              tamanho="sm"
+              variante="primario"
+              onClick={() => abrir({ tipo: "transacao" })}
+            >
               <Plus size={16} />
               Nova transação
             </Botao>
@@ -550,7 +682,11 @@ export function TransacoesRecentes() {
         agruparPorDia(recentes).map((g) => (
           <section key={g.data} className="mt-4">
             <h3 className="text-[11px]/4 font-semibold tracking-[0.08em] text-ink-3 uppercase">
-              {g.data === hoje ? "Hoje" : g.data === ontem ? "Ontem" : dataBR(g.data).slice(0, 5)}
+              {g.data === hoje
+                ? "Hoje"
+                : g.data === ontem
+                  ? "Ontem"
+                  : dataBR(g.data).slice(0, 5)}
             </h3>
             <ul>
               {g.itens.map((t) => {
@@ -572,13 +708,17 @@ export function TransacoesRecentes() {
                         }
                         tamanho={32}
                         className={
-                          t.tipo === "entrada" ? "!bg-good-soft !text-good-text" : undefined
+                          t.tipo === "entrada"
+                            ? "!bg-good-soft !text-good-text"
+                            : undefined
                         }
                       />
                       <span className="min-w-0 flex-1 truncate text-sm text-ink">
                         {t.descricao}
                       </span>
-                      <span className="hidden truncate text-xs text-ink-3 @md:block">{c.nome}</span>
+                      <span className="hidden truncate text-xs text-ink-3 @md:block">
+                        {c.nome}
+                      </span>
                       <span
                         className={cx(
                           "tabular w-24 text-right text-sm font-semibold",
@@ -605,7 +745,10 @@ export function TransacoesRecentes() {
 export function ResultadoMes() {
   const { dados, mes } = useApp();
   const perfil = usePerfil();
-  const r = useMemo(() => resultadoDoMes(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  const r = useMemo(
+    () => resultadoDoMes(dados, perfil.id, mes),
+    [dados, perfil.id, mes],
+  );
   const melhorou = r.variacao !== null && r.variacao > 0;
   // Sobra dos últimos 6 meses, para ver a tendência.
   const historico = useMemo(
@@ -620,17 +763,24 @@ export function ResultadoMes() {
 
   return (
     <Painel className="flex h-full flex-col p-4 sm:p-6">
-      <TituloPainel detalhe={nomeMes(mes).toLowerCase()}>Resultado</TituloPainel>
+      <TituloPainel detalhe={nomeMes(mes).toLowerCase()}>
+        Resultado
+      </TituloPainel>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Valor
           centavos={r.resultado}
-          className={cx("text-[34px] leading-none", r.resultado < 0 && "!text-bad-text")}
+          className={cx(
+            "text-[34px] leading-none",
+            r.resultado < 0 && "!text-bad-text",
+          )}
         />
         {r.variacao !== null && (
           <span
             className={cx(
               "tabular inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold",
-              melhorou ? "bg-good-soft text-good-text" : "bg-warn-soft text-warn-text",
+              melhorou
+                ? "bg-good-soft text-good-text"
+                : "bg-warn-soft text-warn-text",
             )}
           >
             {melhorou ? <TrendingUp size={12} /> : <TrendingDown size={12} />}

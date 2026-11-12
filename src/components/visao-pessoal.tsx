@@ -79,7 +79,9 @@ function ItemLegenda({
           {formatar(valor)}
         </span>
         {fracao != null && (
-          <span className="text-xs font-normal text-ink-3">· {porcento(fracao)}</span>
+          <span className="text-xs font-normal text-ink-3">
+            · {porcento(fracao)}
+          </span>
         )}
         {acao}
       </p>
@@ -99,7 +101,10 @@ export function SaldoPrevisto() {
     [dados, perfil.id, mesContas],
   );
   // Salário que caiu na conta (vindo do banco) diferente do cadastrado.
-  const recebido = useMemo(() => salarioRecebido(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  const recebido = useMemo(
+    () => salarioRecebido(dados, perfil.id, mes),
+    [dados, perfil.id, mes],
+  );
   const vigente = rendaNoMes(perfil, mes);
   const salarioMudou = salarioDiferente(recebido, vigente.salario);
   const usarRecebido = async () => {
@@ -111,7 +116,9 @@ export function SaldoPrevisto() {
       historico,
     });
     if (eu && eu.salarioCompartilhado !== null) {
-      await atualizar("moradores", eu.id, { salarioCompartilhado: atual.salario });
+      await atualizar("moradores", eu.id, {
+        salarioCompartilhado: atual.salario,
+      });
     }
     // O salário que caiu agora já conta em Minha renda: sai do resumo para não contar duas vezes.
     await Promise.all(
@@ -126,7 +133,9 @@ export function SaldoPrevisto() {
         )
         .map((t) => atualizar("transacoes", t.id, { soSaldo: true })),
     );
-    avisar(`Salário de ${formatar(recebido)} a partir de ${nomeMes(mes).toLowerCase()}.`);
+    avisar(
+      `Salário de ${formatar(recebido)} a partir de ${nomeMes(mes).toLowerCase()}.`,
+    );
   };
   const fr = (v: number) => (r.renda > 0 ? v / r.renda : null);
   const falta = r.sobra < 0;
@@ -136,14 +145,19 @@ export function SaldoPrevisto() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <TituloPainel
-            detalhe={mesContas !== mes ? nomeMes(mesContas).toLowerCase() : undefined}
+            detalhe={
+              mesContas !== mes ? nomeMes(mesContas).toLowerCase() : undefined
+            }
           >
             Saldo previsto
           </TituloPainel>
           <div className="mt-6 flex flex-wrap items-end gap-x-6 gap-y-4">
             <Valor
               centavos={r.sobra}
-              className={cx("text-[44px] leading-none sm:text-[62px]", falta && "!text-bad-text")}
+              className={cx(
+                "text-[44px] leading-none sm:text-[62px]",
+                falta && "!text-bad-text",
+              )}
             />
             <div className="border-line pb-1 sm:border-l sm:pl-6">
               {r.renda === 0 ? (
@@ -179,20 +193,57 @@ export function SaldoPrevisto() {
       </div>
 
       <div className="mt-8">
-        <BarraFina
-          rotulo="Para onde vai a renda do mês"
-          partes={[
-            { id: "casa", rotulo: "Sua parte da casa", valor: r.parteCasa, cor: "var(--seg-casa)" },
-            {
-              id: "pessoal",
-              rotulo: "Contas pessoais",
-              valor: r.pessoais,
-              cor: "var(--seg-pessoal)",
-            },
-            { id: "dia", rotulo: "Dia a dia", valor: r.diaADia, cor: "var(--seg-dia)" },
-            { id: "sobra", rotulo: "Sobra", valor: Math.max(0, r.sobra), cor: "var(--seg-sobra)" },
-          ]}
-        />
+        {falta ? (
+          // Saídas maiores que a renda: a barra é o total a pagar, e mostra a
+          // parte que a renda cobre e a que falta.
+          <BarraFina
+            rotulo="Quanto da conta a renda cobre"
+            partes={[
+              {
+                id: "coberto",
+                rotulo: "Coberto pela renda",
+                valor: r.renda,
+                cor: "var(--seg-pessoal)",
+              },
+              {
+                id: "falta",
+                rotulo: "Falta",
+                valor: -r.sobra,
+                cor: "var(--bad)",
+              },
+            ]}
+          />
+        ) : (
+          <BarraFina
+            rotulo="Para onde vai a renda do mês"
+            partes={[
+              {
+                id: "casa",
+                rotulo: "Sua parte da casa",
+                valor: r.parteCasa,
+                cor: "var(--seg-casa)",
+              },
+              {
+                id: "pessoal",
+                rotulo: "Contas pessoais",
+                valor: r.pessoais,
+                cor: "var(--seg-pessoal)",
+              },
+              {
+                id: "dia",
+                rotulo: "Dia a dia",
+                valor: r.diaADia,
+                cor: "var(--seg-dia)",
+              },
+              {
+                id: "sobra",
+                rotulo: "Sobra",
+                valor: Math.max(0, r.sobra),
+                cor: "var(--seg-sobra)",
+              },
+            ]}
+          />
+        )}
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 min-[1700px]:grid-cols-5">
@@ -246,8 +297,9 @@ export function SaldoPrevisto() {
       {salarioMudou && (
         <div className="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg bg-primary-soft p-4">
           <p className="min-w-0 flex-1 text-[13px]/5 text-primary-text">
-            Caiu <strong className="font-semibold">{formatar(recebido)}</strong> de salário na conta
-            em {nomeMes(mes).toLowerCase()}; o cadastrado é {formatar(vigente.salario)}.
+            Caiu <strong className="font-semibold">{formatar(recebido)}</strong>{" "}
+            de salário na conta em {nomeMes(mes).toLowerCase()}; o cadastrado é{" "}
+            {formatar(vigente.salario)}.
           </p>
           <Botao tamanho="sm" variante="primario" onClick={usarRecebido}>
             Usar {formatar(recebido, { semCentavos: true })} daqui em diante
@@ -269,9 +321,12 @@ export function ContasAPagar() {
   const perfil = usePerfil();
   const { abrir } = useModais();
   // O filtro de dia (uma data de vencimento) vale só para o mês em que foi escolhido.
-  const [filtro, setFiltro] = useState<{ mes: string; data: string } | null>(null);
+  const [filtro, setFiltro] = useState<{ mes: string; data: string } | null>(
+    null,
+  );
   const diaSel = filtro && filtro.mes === mes ? filtro.data : null;
-  const setDiaSel = (data: string | null) => setFiltro(data === null ? null : { mes, data });
+  const setDiaSel = (data: string | null) =>
+    setFiltro(data === null ? null : { mes, data });
 
   // Contas do mês escolhido. Faturas: no mês de hoje, as que estão em aberto
   // (podem ser do mês seguinte, quando as deste mês já foram pagas).
@@ -288,7 +343,9 @@ export function ContasAPagar() {
             .filter((i) => i.refTipo === "fatura" && meu(i))
             .map((i) => ({ ...i, mesRef: mesFatura }));
     return [...doMes, ...faturas].sort(
-      (a, b) => vencimentoDe(a).localeCompare(vencimentoDe(b)) || a.nome.localeCompare(b.nome),
+      (a, b) =>
+        vencimentoDe(a).localeCompare(vencimentoDe(b)) ||
+        a.nome.localeCompare(b.nome),
     );
   }, [dados, mes, mesFatura, perfil.id, eu]);
 
@@ -296,19 +353,23 @@ export function ContasAPagar() {
   const falta = abertas.reduce((s, i) => s + i.valor, 0);
   const total = itens.reduce((s, i) => s + i.valor, 0);
   const dias = [...new Set(itens.map(vencimentoDe))];
-  const lista = diaSel === null ? itens : itens.filter((i) => vencimentoDe(i) === diaSel);
+  const lista =
+    diaSel === null ? itens : itens.filter((i) => vencimentoDe(i) === diaSel);
 
   let quando: string | null = null;
   if (mes === mesHoje && abertas.length) {
     const atrasadas = abertas.filter((i) => vencimentoDe(i) < hoje).length;
     const proxima = abertas.find((i) => vencimentoDe(i) >= hoje);
-    if (atrasadas) quando = atrasadas === 1 ? "1 atrasada" : `${atrasadas} atrasadas`;
+    if (atrasadas)
+      quando = atrasadas === 1 ? "1 atrasada" : `${atrasadas} atrasadas`;
     else if (proxima) {
       const d = Math.round(
-        (Date.parse(`${vencimentoDe(proxima)}T12:00:00Z`) - Date.parse(`${hoje}T12:00:00Z`)) /
+        (Date.parse(`${vencimentoDe(proxima)}T12:00:00Z`) -
+          Date.parse(`${hoje}T12:00:00Z`)) /
           86_400_000,
       );
-      quando = d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `em ${d} dias`;
+      quando =
+        d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `em ${d} dias`;
     }
   }
 
@@ -335,7 +396,9 @@ export function ContasAPagar() {
                 <span
                   className={cx(
                     "font-medium",
-                    quando.includes("atrasada") ? "text-bad-text" : "text-ink-2",
+                    quando.includes("atrasada")
+                      ? "text-bad-text"
+                      : "text-ink-2",
                   )}
                 >
                   {quando}
@@ -349,7 +412,12 @@ export function ContasAPagar() {
             {itens.length > 0 && <> · total {formatar(total)}</>}
           </p>
         </div>
-        <Ilustracao painel="contas" icone={CalendarDays} tom="ambar" tamanho={64} />
+        <Ilustracao
+          painel="contas"
+          icone={CalendarDays}
+          tom="ambar"
+          tamanho={64}
+        />
       </div>
 
       {itens.length === 0 ? (
@@ -359,7 +427,11 @@ export function ContasAPagar() {
           titulo="Nenhuma conta neste mês"
           texto="Cadastre as contas fixas uma vez e elas aparecem todo mês."
         >
-          <Botao tamanho="sm" variante="primario" onClick={() => abrir({ tipo: "conta" })}>
+          <Botao
+            tamanho="sm"
+            variante="primario"
+            onClick={() => abrir({ tipo: "conta" })}
+          >
             <Plus size={16} />
             Adicionar conta
           </Botao>
@@ -396,12 +468,18 @@ export function ContasAPagar() {
                     {d.slice(8)}
                     {/* Fatura em aberto de outro mês: o mês junto do dia. */}
                     {deOutroMes && (
-                      <span className="text-[10px] font-medium opacity-70">/{d.slice(5, 7)}</span>
+                      <span className="text-[10px] font-medium opacity-70">
+                        /{d.slice(5, 7)}
+                      </span>
                     )}
                   </span>
                   <span className="flex h-2 items-center gap-1">
                     {quitado ? (
-                      <Check size={12} strokeWidth={3.5} className={ativo ? "" : "text-good"} />
+                      <Check
+                        size={12}
+                        strokeWidth={3.5}
+                        className={ativo ? "" : "text-good"}
+                      />
                     ) : (
                       doDia
                         .slice(0, 5)
@@ -410,7 +488,11 @@ export function ContasAPagar() {
                             key={i.chave}
                             className={cx(
                               "h-1 w-1 rounded-full",
-                              ativo ? "bg-white" : i.pago ? "bg-line-strong" : "bg-primary",
+                              ativo
+                                ? "bg-white"
+                                : i.pago
+                                  ? "bg-line-strong"
+                                  : "bg-primary",
                             )}
                           />
                         ))
@@ -429,19 +511,27 @@ export function ContasAPagar() {
               >
                 <Marcador
                   marcado={i.pago}
-                  rotulo={i.pago ? `Desmarcar ${i.nome}` : `Marcar ${i.nome} como paga`}
+                  rotulo={
+                    i.pago
+                      ? `Desmarcar ${i.nome}`
+                      : `Marcar ${i.nome} como paga`
+                  }
                   onMudar={(v) => marcarPago(i, i.mesRef, v)}
                 />
                 <button
                   type="button"
-                  onClick={() => abrir({ tipo: "ocorrencia", item: i, mes: i.mesRef })}
+                  onClick={() =>
+                    abrir({ tipo: "ocorrencia", item: i, mes: i.mesRef })
+                  }
                   className="-my-1 flex min-w-0 flex-1 items-center gap-4 rounded-lg py-1 text-left"
                 >
                   <span className="min-w-0 flex-1">
                     <span
                       className={cx(
                         "block truncate text-sm font-medium",
-                        i.pago ? "text-ink-3 line-through decoration-line-strong" : "text-ink",
+                        i.pago
+                          ? "text-ink-3 line-through decoration-line-strong"
+                          : "text-ink",
                       )}
                     >
                       {i.nome}
@@ -455,14 +545,18 @@ export function ContasAPagar() {
                       </span>
                     )}
                   </span>
-                  {diaSel !== null && i.escopo === "casa" && <Etiqueta>casa</Etiqueta>}
+                  {diaSel !== null && i.escopo === "casa" && (
+                    <Etiqueta>casa</Etiqueta>
+                  )}
                   <span
                     className={cx(
                       "tabular text-sm font-semibold whitespace-nowrap",
                       i.pago ? "text-ink-3" : "text-ink",
                     )}
                   >
-                    {i.estimada && <span className="mr-1 font-normal text-ink-3">≈</span>}
+                    {i.estimada && (
+                      <span className="mr-1 font-normal text-ink-3">≈</span>
+                    )}
                     {formatar(i.valor)}
                   </span>
                 </button>
@@ -483,7 +577,8 @@ export function Moradia() {
   const { dados, mes, lar } = useApp();
   const perfil = usePerfil();
   const [escolha, setBase] = useState<"meu" | "casa">("meu");
-  const podeCasa = !!lar && dados.moradores.some((m) => m.salarioCompartilhado !== null);
+  const podeCasa =
+    !!lar && dados.moradores.some((m) => m.salarioCompartilhado !== null);
   const base = podeCasa ? escolha : "meu";
   const r = useMemo(
     () => resumoMoradia(dados, perfil.id, mes, base),
@@ -501,10 +596,14 @@ export function Moradia() {
           <div className="min-w-0">
             <TituloPainel>Moradia</TituloPainel>
             <p className="mt-4 text-[13px]/5 text-ink-3">
-              Marque aluguel, condomínio, luz e parecidas como &quot;Gasto de moradia&quot; para ver
-              quanto do salário vai para morar (a referência é até {porcento(REFERENCIA_MORADIA)}).
+              Marque aluguel, condomínio, luz e parecidas como &quot;Gasto de
+              moradia&quot; para ver quanto do salário vai para morar (a
+              referência é até {porcento(REFERENCIA_MORADIA)}).
             </p>
-            <Link href="/contas" className={cx(classesBotao("secundario", "sm"), "mt-4")}>
+            <Link
+              href="/contas"
+              className={cx(classesBotao("secundario", "sm"), "mt-4")}
+            >
               Ir para Contas
             </Link>
           </div>
@@ -520,9 +619,15 @@ export function Moradia() {
         <div className="min-w-0">
           <TituloPainel>Moradia</TituloPainel>
           <p className="mt-4 text-[13px]/5 text-ink-3">
-            {base === "meu" ? "Quanto você gasta pra morar" : "Quanto a casa gasta pra morar"}
+            {base === "meu"
+              ? "Quanto você gasta pra morar"
+              : "Quanto a casa gasta pra morar"}
           </p>
-          <Valor centavos={r.total} aprox={estimado} className="mt-1 text-[34px] leading-none" />
+          <Valor
+            centavos={r.total}
+            aprox={estimado}
+            className="mt-1 text-[34px] leading-none"
+          />
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px]/5">
             {r.fracao === null ? (
               <span className="text-ink-3">
@@ -538,10 +643,17 @@ export function Moradia() {
                     acima ? "text-warn-text" : "text-good-text",
                   )}
                 >
-                  {acima ? <TriangleAlert size={16} /> : <Check size={16} strokeWidth={3} />}
-                  {porcento(r.fracao)} {base === "meu" ? "do salário" : "dos salários"}
+                  {acima ? (
+                    <TriangleAlert size={16} />
+                  ) : (
+                    <Check size={16} strokeWidth={3} />
+                  )}
+                  {porcento(r.fracao)}{" "}
+                  {base === "meu" ? "do salário" : "dos salários"}
                 </span>
-                <span className="text-ink-3">referência: até {porcento(REFERENCIA_MORADIA)}</span>
+                <span className="text-ink-3">
+                  referência: até {porcento(REFERENCIA_MORADIA)}
+                </span>
               </>
             )}
           </p>
@@ -557,12 +669,17 @@ export function Moradia() {
           onMudar={setBase}
           opcoes={[
             { valor: "meu", rotulo: "Só meu salário" },
-            { valor: "casa", rotulo: "Salários da casa", desativado: !podeCasa },
+            {
+              valor: "casa",
+              rotulo: "Salários da casa",
+              desativado: !podeCasa,
+            },
           ]}
         />
         {base === "casa" && (
           <p className="mt-2 text-xs text-ink-3">
-            {r.compartilham} de {dados.moradores.length} moradores mostram o salário para a casa.
+            {r.compartilham} de {dados.moradores.length} moradores mostram o
+            salário para a casa.
           </p>
         )}
       </div>
@@ -579,11 +696,13 @@ export function Moradia() {
         </div>
       )}
 
-      <p className="mt-6 text-xs font-semibold text-ink">O que entra na conta</p>
+      <p className="mt-6 text-xs font-semibold text-ink">
+        O que entra na conta
+      </p>
       {r.itens.length === 0 ? (
         <p className="mt-2 text-[13px] leading-5 text-ink-3">
-          Nada ainda. Ao cadastrar aluguel, condomínio, luz e parecidas, ligue a opção &quot;Gasto
-          de moradia&quot;.
+          Nada ainda. Ao cadastrar aluguel, condomínio, luz e parecidas, ligue a
+          opção &quot;Gasto de moradia&quot;.
         </p>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">
@@ -591,9 +710,13 @@ export function Moradia() {
             <li key={i.nome} className="flex min-w-0 items-center gap-4">
               <Ladrilho icone={categoria(i.categoria).icone} />
               <span className="min-w-0">
-                <span className="block truncate text-xs text-ink-3">{i.nome}</span>
+                <span className="block truncate text-xs text-ink-3">
+                  {i.nome}
+                </span>
                 <span className="tabular block text-sm font-semibold text-ink">
-                  {i.estimada && <span className="mr-1 font-normal text-ink-3">≈</span>}
+                  {i.estimada && (
+                    <span className="mr-1 font-normal text-ink-3">≈</span>
+                  )}
                   {formatar(i.valor)}
                 </span>
               </span>
