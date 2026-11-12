@@ -416,7 +416,7 @@ export function movimentoAvulso(
   let saidas = 0;
   const porCategoria: Record<string, number> = {};
   for (const t of transacoes) {
-    if (t.perfilId !== perfilId || t.data.slice(0, 7) !== mes) continue;
+    if (t.perfilId !== perfilId || t.data.slice(0, 7) !== mes || t.soSaldo) continue;
     if (t.tipo === "entrada") entradas += t.valor;
     if (t.tipo === "saida") {
       saidas += t.valor;

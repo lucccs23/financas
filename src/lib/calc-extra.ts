@@ -47,7 +47,7 @@ export function ritmoDeGasto(dados: Dados, perfilId: Id, mes: Mes, hoje: string)
 
   const porDia = Array.from({ length: dias }, () => 0);
   for (const t of dados.transacoes ?? []) {
-    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.data.slice(0, 7) !== mes) continue;
+    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo || t.data.slice(0, 7) !== mes) continue;
     const d = Math.min(dias, Math.max(1, Number(t.data.slice(8, 10))));
     porDia[d - 1] += t.valor;
   }

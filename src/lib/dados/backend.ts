@@ -2,6 +2,7 @@
 // Há três implementações: "computador" (arquivo na pasta do projeto), "nuvem"
 // (Supabase) e "github" (arquivo num repositório privado do GitHub).
 
+import type { StatusOpenFinance } from "../open-finance";
 import type { Dados, Id, Linha, NomeTabela } from "../types";
 
 export interface Sessao {
@@ -31,6 +32,14 @@ export interface Backend {
     /** Confere a chave lendo o repositório antes de guardar. */
     conectar(repositorio: string, chave: string): Promise<void>;
     desconectar(): Promise<void>;
+  };
+
+  /** GitHub: busca automática no Open Finance (feita pelo repositório dos dados). */
+  openFinance?: {
+    /** null quando a busca nunca rodou. */
+    status(): Promise<StatusOpenFinance | null>;
+    /** Pede uma busca agora. Os dados chegam em uns 2 minutos. */
+    buscarAgora(): Promise<void>;
   };
 
   /** Preparação antes do primeiro uso (ex.: levar dados antigos para o arquivo). */

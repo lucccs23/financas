@@ -100,7 +100,8 @@ create table public.cartao (
   limite_ajuste bigint not null default 0, -- acerto para bater com o disponível do banco
   limite_conferido_em date,                -- quando o limite foi conferido com o banco
   imagem text, -- foto do cartão (imagem pequena, em texto)
-  logo text    -- logo do banco (imagem pequena, em texto)
+  logo text,   -- logo do banco (imagem pequena, em texto)
+  externo_id text -- item do banco (Open Finance) que originou o cartão
 );
 
 create table public.compra (
@@ -115,7 +116,8 @@ create table public.compra (
   mes_primeira text not null,
   mes_fim text,
   data date not null,
-  categoria text not null default 'outros'
+  categoria text not null default 'outros',
+  externo_id text
 );
 
 create table public.acerto (
@@ -161,7 +163,8 @@ create table public.carteira (
   tipo text not null default 'corrente' check (tipo in ('corrente', 'poupanca', 'dinheiro', 'investimento')),
   saldo_inicial bigint not null default 0,
   cor integer not null default 0,
-  arquivada boolean not null default false
+  arquivada boolean not null default false,
+  externo_id text
 );
 
 create table public.transacao (
@@ -174,7 +177,9 @@ create table public.transacao (
   categoria text not null default 'outros',
   carteira_id uuid references public.carteira (id) on delete set null,
   carteira_destino_id uuid references public.carteira (id) on delete set null,
-  observacao text not null default ''
+  observacao text not null default '',
+  externo_id text,
+  so_saldo boolean not null default false
 );
 
 create index on public.morador (lar_id);

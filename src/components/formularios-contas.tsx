@@ -3,7 +3,7 @@
 // Janelas de cadastro: conta, ajuste de um mês, cartão e compra.
 
 import { useState } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import { Landmark, Pencil, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/app";
 import {
   ajusteParaDisponivel,
@@ -936,7 +936,7 @@ export function FormCompra({
       onEnviar={salvar}
       rodape={
         <>
-          {compra && <BotaoExcluir onClick={excluir} />}
+          {compra && !compra.externoId && <BotaoExcluir onClick={excluir} />}
           <Botao variante="fantasma" onClick={onFechar}>
             Cancelar
           </Botao>
@@ -946,6 +946,15 @@ export function FormCompra({
         </>
       }
     >
+      {compra?.externoId && (
+        <p className="flex items-start gap-2 rounded-lg bg-primary-soft p-4 text-xs leading-5 text-primary-text">
+          <Landmark size={16} className="mt-0.5 shrink-0" />
+          <span>
+            Veio da fatura pelo Open Finance. Você pode mudar a descrição e a categoria; ela some
+            daqui só se sair da fatura no banco.
+          </span>
+        </p>
+      )}
       <Campo rotulo="Cartão">
         <Selecao
           value={cartaoId}

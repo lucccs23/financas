@@ -73,11 +73,13 @@ export default function PaginaTransacoes() {
         categoria(t.categoria).nome.toLowerCase().includes(termo)),
   );
 
-  const entradas = filtradas.filter((t) => t.tipo === "entrada").reduce((s, t) => s + t.valor, 0);
-  const saidas = filtradas.filter((t) => t.tipo === "saida").reduce((s, t) => s + t.valor, 0);
+  // "Só saldo" (fatura paga, dinheiro entre contas suas...) aparece no extrato, mas
+  // não soma como gasto nem como entrada.
+  const entradas = filtradas.filter((t) => t.tipo === "entrada" && !t.soSaldo).reduce((s, t) => s + t.valor, 0);
+  const saidas = filtradas.filter((t) => t.tipo === "saida" && !t.soSaldo).reduce((s, t) => s + t.valor, 0);
   const meses = Array.from({ length: 7 }, (_, i) => addMes(mes, i - 5));
   const saidasDo = (m: string) =>
-    minhas.filter((t) => t.tipo === "saida" && t.data.slice(0, 7) === m).reduce((s, t) => s + t.valor, 0);
+    minhas.filter((t) => t.tipo === "saida" && !t.soSaldo && t.data.slice(0, 7) === m).reduce((s, t) => s + t.valor, 0);
   const maiorMes = Math.max(1, ...meses.map(saidasDo));
   const categoriasUsadas = [...new Set(doMes.map((t) => t.categoria))];
   const carteiraNome = (id: string | null) => dados.carteiras.find((c) => c.id === id)?.nome;
@@ -85,7 +87,7 @@ export default function PaginaTransacoes() {
 
   const mapaCategorias = new Map<string, number>();
   for (const t of filtradas) {
-    if (t.tipo === "saida") mapaCategorias.set(t.categoria, (mapaCategorias.get(t.categoria) ?? 0) + t.valor);
+    if (t.tipo === "saida" && !t.soSaldo) mapaCategorias.set(t.categoria, (mapaCategorias.get(t.categoria) ?? 0) + t.valor);
   }
   const porCategoria = [...mapaCategorias]
     .map(([c, v]) => ({ categoria: c, valor: v }))
@@ -299,13 +301,17 @@ export default function PaginaTransacoes() {
                             <span className="block truncate text-xs text-ink-3">
                               {t.tipo === "transferencia"
                                 ? `${carteiraNome(t.carteiraId) ?? "?"} → ${carteiraNome(t.carteiraDestinoId) ?? "?"}`
-                                : [c.nome, carteiraNome(t.carteiraId)].filter(Boolean).join(" · ")}
+                                : [c.nome, carteiraNome(t.carteiraId), t.soSaldo && "só saldo"].filter(Boolean).join(" · ")}
                             </span>
                           </span>
                           <span
                             className={cx(
                               "tabular text-sm font-semibold whitespace-nowrap",
-                              t.tipo === "entrada" ? "text-good-text" : t.tipo === "transferencia" ? "text-ink-3" : "text-ink",
+                              t.tipo === "transferencia" || t.soSaldo
+                                ? "text-ink-3"
+                                : t.tipo === "entrada"
+                                  ? "text-good-text"
+                                  : "text-ink",
                             )}
                           >
                             {t.tipo === "entrada" ? "+ " : t.tipo === "saida" ? "− " : ""}

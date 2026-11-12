@@ -3,7 +3,7 @@
 // Janelas de transação avulsa, carteira e importação de extrato.
 
 import { useMemo, useRef, useState } from "react";
-import { FileUp, Trash2 } from "lucide-react";
+import { EyeOff, FileUp, Landmark, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/app";
 import { saldoCarteira } from "@/lib/calc-extra";
 import { CATEGORIAS, sugerirCategoria } from "@/lib/categorias";
@@ -57,6 +57,8 @@ export function FormTransacao({
   const [carteiraId, setCarteiraId] = useState<Id>(transacao?.carteiraId ?? carteiras[0]?.id ?? "");
   const [destinoId, setDestinoId] = useState<Id>(transacao?.carteiraDestinoId ?? "");
   const [observacao, setObservacao] = useState(transacao?.observacao ?? "");
+  const [soSaldo, setSoSaldo] = useState(transacao?.soSaldo ?? false);
+  const doBanco = !!transacao?.externoId;
 
   const categorias = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS;
 
@@ -82,6 +84,7 @@ export function FormTransacao({
       carteiraId: carteiraId || null,
       carteiraDestinoId: tipo === "transferencia" ? destinoId : null,
       observacao: observacao.trim(),
+      soSaldo: tipo !== "transferencia" && soSaldo,
     };
     onFechar();
     if (transacao) await atualizar("transacoes", transacao.id, linha);
@@ -96,6 +99,15 @@ export function FormTransacao({
     avisar("Transação excluída.");
   };
 
+  // O que veio do banco voltaria na próxima busca se fosse excluído: em vez
+  // disso, sai do resumo do mês e fica só no extrato e no saldo.
+  const tirarDoResumo = async () => {
+    if (!transacao) return;
+    onFechar();
+    await atualizar("transacoes", transacao.id, { soSaldo: true });
+    avisar("Fora do resumo do mês. Continua no extrato e no saldo da carteira.");
+  };
+
   return (
     <Modal
       titulo={transacao ? "Editar transação" : "Nova transação"}
@@ -108,7 +120,13 @@ export function FormTransacao({
       onEnviar={salvar}
       rodape={
         <>
-          {transacao && (
+          {transacao && doBanco && !transacao.soSaldo && (
+            <Botao variante="fantasma" onClick={tirarDoResumo} className="mr-auto">
+              <EyeOff size={16} />
+              Tirar do resumo
+            </Botao>
+          )}
+          {transacao && !doBanco && (
             <Botao variante="fantasma" onClick={excluir} className="mr-auto !text-bad-text">
               <Trash2 size={16} />
               Excluir
@@ -123,6 +141,12 @@ export function FormTransacao({
         </>
       }
     >
+      {transacao?.externoId && (
+        <p className="flex items-start gap-2 rounded-lg bg-primary-soft p-4 text-xs leading-5 text-primary-text">
+          <Landmark size={16} className="mt-0.5 shrink-0" />
+          <span>Veio do banco pelo Open Finance. Você pode mudar a descrição e a categoria; para não contar no mês, use “Tirar do resumo”.</span>
+        </p>
+      )}
       <Segmentado
         cheio
         rotulo="Tipo"
@@ -222,6 +246,15 @@ export function FormTransacao({
       <Campo rotulo="Anotação (opcional)">
         <Entrada value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={120} />
       </Campo>
+
+      {tipo !== "transferencia" && (
+        <Alternar
+          ligado={soSaldo}
+          onMudar={setSoSaldo}
+          titulo="Só mexe no saldo"
+          descricao="Fica no extrato e no saldo da carteira, mas fora do resumo do mês. Para pagamento de fatura, dinheiro entre contas suas ou algo que já conta em Contas."
+        />
+      )}
     </Modal>
   );
 }

@@ -207,6 +207,58 @@ O resultado fica na pasta `.next-online`.
 com login por e-mail, em vez do repositório dos dados. Em **Authentication >
 URL Configuration**, coloque o endereço do site em **Site URL**.
 
+## Open Finance (bancos automáticos, pelo Meu Pluggy)
+
+Com o site no GitHub, o app pode buscar sozinho as contas, cartões e
+movimentações dos bancos, pelo Open Finance oficial. Usa o **Meu Pluggy**,
+gratuito para uso pessoal.
+
+**Como funciona:** uma tarefa automática no repositório **privado** dos dados
+([scripts/open-finance/buscar-no-banco.yml](scripts/open-finance/buscar-no-banco.yml))
+roda às 7h, 13h e 19h e também pelo botão **Buscar agora**, em Carteiras. Ela
+pega na Pluggy o que mudou nos últimos 90 dias e grava no `financas.json`. A
+chave secreta da Pluggy fica só nos segredos desse repositório, nunca no site.
+
+**O que entra no app:**
+
+- Cada conta do banco vira uma **carteira**, com o saldo igual ao do banco.
+- Cada cartão vira um **cartão**, com limite, fechamento e vencimento do banco,
+  e o limite livre igual ao do app do banco.
+- Extrato vira **Transações**; compras do cartão viram **compras** (a parcelada
+  entra uma vez só, com todas as parcelas).
+- Nada entra duas vezes. O que você já tinha lançado à mão é reconhecido (mesmo
+  valor, data próxima) e ligado ao banco em vez de repetido.
+- O que já conta em outro lugar entra como **só saldo** (fica no extrato e no
+  saldo, mas fora do resumo do mês): pagamento de fatura, dinheiro entre contas
+  suas, aplicações, salário já cadastrado em Minha renda e contas fixas de mesmo
+  valor (que ficam marcadas como pagas).
+- O que veio do banco não pode ser excluído (voltaria na próxima busca). Para
+  não contar no mês, use **Tirar do resumo**.
+
+**Configurar (uma vez):**
+
+1. Em **meu.pluggy.ai**, conecte os bancos.
+2. Em **dashboard.pluggy.ai**, crie a conta de desenvolvedor, inclua o conector
+   **MeuPluggy** na lista de conectores e crie uma **Development Application**.
+   Anote o **Client ID** e o **Client Secret**.
+3. Na aplicação **Demo** do painel, conecte o **MeuPluggy** uma vez para cada
+   banco. Cada conexão tem um **id** (o *item id*): anote todos.
+4. No repositório dos dados, em **Settings > Secrets and variables > Actions**:
+   - **Secrets:** `PLUGGY_CLIENT_ID` e `PLUGGY_CLIENT_SECRET`;
+   - **Variables:** `PLUGGY_CONEXOES`, uma conexão por linha, no formato
+     `id-da-conexao = Nome do perfil no app`.
+5. Para o botão **Buscar agora**, a chave de acesso do app precisa também da
+   permissão **Actions: Read and write** (edite a chave no GitHub).
+
+Para conectar os bancos de outra pessoa da casa, ela faz os passos 1 e 3 na
+conta dela do Meu Pluggy, autorizando a mesma aplicação, e você acrescenta as
+conexões dela em `PLUGGY_CONEXOES` com o nome do perfil dela.
+
+> O painel de desenvolvedor da Pluggy começa com 15 dias de teste. Pela
+> documentação do Meu Pluggy, a busca continua funcionando depois disso; se a
+> Pluggy mudar essa condição, só a busca automática para, o resto do app segue
+> igual.
+
 ## Como as contas são feitas
 
 - **Saldo previsto** = renda − sua parte da casa − contas pessoais − dia a dia.
@@ -230,6 +282,8 @@ URL Configuration**, coloque o endereço do site em **Site URL**.
 | Leitura do CSV da fatura e palavras que sugerem categorias | [src/lib/importar.ts](src/lib/importar.ts), [src/lib/categorias.ts](src/lib/categorias.ts) |
 | Arquivo de dados e cópias diárias | [src/lib/servidor/arquivo.ts](src/lib/servidor/arquivo.ts) |
 | Dados no repositório do GitHub | [src/lib/dados/github.ts](src/lib/dados/github.ts) |
+| Open Finance: regras de importação | [src/lib/open-finance.ts](src/lib/open-finance.ts), com testes em [src/lib/open-finance.test.ts](src/lib/open-finance.test.ts) |
+| Open Finance: busca na Pluggy | [scripts/buscar-no-banco.ts](scripts/buscar-no-banco.ts) |
 | Dados de exemplo | [src/lib/exemplo.ts](src/lib/exemplo.ts) |
 | Telas | `src/app/*/page.tsx` |
 | Formulários | `src/components/formularios-*.tsx` |

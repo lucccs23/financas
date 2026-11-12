@@ -105,6 +105,8 @@ export interface Cartao {
   imagem?: string | null;
   /** Logo do banco (data URL), no lugar do nome escrito. */
   logo?: string | null;
+  /** Item do banco (Open Finance) que originou este registro. Vazio = lançado à mão. */
+  externoId?: string | null;
 }
 
 export interface Compra {
@@ -123,6 +125,8 @@ export interface Compra {
   mesFim: Mes | null;
   data: string;
   categoria?: string;
+  /** Item do banco (Open Finance) que originou este registro. Vazio = lançado à mão. */
+  externoId?: string | null;
 }
 
 export interface Acerto {
@@ -170,6 +174,8 @@ export interface Carteira {
   cor: number;
   /** Fica de fora do saldo total (ex.: conta que você só acompanha). */
   arquivada: boolean;
+  /** Item do banco (Open Finance) que originou este registro. Vazio = lançado à mão. */
+  externoId?: string | null;
 }
 
 export type TipoTransacao = "saida" | "entrada" | "transferencia";
@@ -192,6 +198,14 @@ export interface Transacao {
   /** Só em transferências: para onde o dinheiro foi. */
   carteiraDestinoId: Id | null;
   observacao: string;
+  /** Item do banco (Open Finance) que originou este registro. Vazio = lançado à mão. */
+  externoId?: string | null;
+  /**
+   * Só mexe no saldo da carteira e fica fora do resumo do mês. Ex.: pagamento
+   * da fatura (as compras já contam pelo cartão), salário que já está no
+   * perfil, conta fixa que já está em Contas, dinheiro entre contas suas.
+   */
+  soSaldo?: boolean;
 }
 
 export interface Dados {

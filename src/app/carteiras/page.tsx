@@ -9,6 +9,7 @@ import { formatar } from "@/lib/dinheiro";
 import { addMes, dataBR, diasNoMes, mesEixo } from "@/lib/meses";
 import { Colunas } from "@/components/graficos";
 import { Ilustracao } from "@/components/ilustracao";
+import { PainelOpenFinance } from "@/components/open-finance";
 import { useModais } from "@/components/modais-contexto";
 import {
   Botao,
@@ -95,6 +96,8 @@ export default function PaginaCarteiras() {
           Nova carteira
         </Botao>
       </CabecalhoPagina>
+
+      <PainelOpenFinance />
 
       <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
         <div className="grid min-w-0 gap-4 sm:gap-6">

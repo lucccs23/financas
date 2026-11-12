@@ -1,0 +1,71 @@
+# Vai no repositório PRIVADO dos dados, em .github/workflows/buscar-no-banco.yml.
+#
+# Busca no Open Finance (via Pluggy) as contas, cartões e movimentações e grava
+# no financas.json. Roda 3 vezes por dia e também pelo botão "Buscar agora" do
+# app (ou em Actions > Buscar no banco > Run workflow).
+#
+# Precisa, em Settings > Secrets and variables > Actions:
+#   Secrets:   PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET
+#   Variables: PLUGGY_CONEXOES  (uma por linha: "<id da conexão> = <nome do perfil>")
+#              APP_REPO         (opcional; padrão: <seu usuário>/financas)
+name: Buscar no banco
+
+on:
+  schedule:
+    # 7h, 13h e 19h no horário de Brasília
+    - cron: "0 10,16,22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: buscar-no-banco
+  cancel-in-progress: false
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Dados
+        uses: actions/checkout@v4
+        with:
+          path: dados
+      - name: Código do app
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.APP_REPO || format('{0}/financas', github.repository_owner) }}
+          path: app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+      - name: Preparar
+        working-directory: app
+        run: npm ci --no-audit --no-fund
+      - name: Buscar na Pluggy
+        working-directory: app
+        env:
+          PLUGGY_CLIENT_ID: ${{ secrets.PLUGGY_CLIENT_ID }}
+          PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
+          PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES }}
+        run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
+      - name: Gravar nos dados
+        working-directory: dados
+        run: |
+          git config user.name "Busca no banco"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Se alguém salvar pelo app no meio, refaz por cima da versão nova.
+          for tentativa in 1 2 3 4 5; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            (cd ../app && npx tsx scripts/buscar-no-banco.ts aplicar "$RUNNER_TEMP/pluggy.json" ../dados/financas.json ../dados/open-finance.json)
+            git add financas.json open-finance.json
+            if git diff --cached --quiet; then echo "Nada novo."; exit 0; fi
+            git commit -q -m "Busca no banco"
+            if git push -q origin HEAD:main; then exit 0; fi
+            sleep $((tentativa * 5))
+          done
+          echo "Não consegui gravar depois de 5 tentativas."; exit 1

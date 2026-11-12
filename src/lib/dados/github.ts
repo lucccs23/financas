@@ -4,6 +4,7 @@
 // As regras são as mesmas do modo computador (operacoes.ts), e cada mudança
 // vira uma versão no histórico do repositório, o que também serve de cópia.
 
+import type { StatusOpenFinance } from "../open-finance";
 import { TABELAS, type Dados, type Id, type Linha, type NomeTabela } from "../types";
 import { novoId, type Backend } from "./backend";
 import * as op from "./operacoes";
@@ -11,6 +12,9 @@ import * as op from "./operacoes";
 const CHAVE_SESSAO = "financas:github:perfil";
 const CHAVE_CONEXAO = "financas:github:conexao";
 const ARQUIVO = "financas.json";
+/** Situação da busca no Open Finance, gravada pela tarefa automática do repositório. */
+const ARQUIVO_OPEN_FINANCE = "open-finance.json";
+const TAREFA_OPEN_FINANCE = "buscar-no-banco.yml";
 
 export interface ConexaoGitHub {
   /** "usuario/repositorio" */
@@ -135,6 +139,37 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
       if (r.status === 409 || r.status === 422) throw new Conflito();
       if (!r.ok) throw falha(r);
       return ((await r.json()) as { content: { sha: string } }).content.sha;
+    },
+
+    async lerStatusOpenFinance(): Promise<StatusOpenFinance | null> {
+      const r = await pedir(`/contents/${ARQUIVO_OPEN_FINANCE}`);
+      if (r.status === 404) return null;
+      if (!r.ok) throw falha(r);
+      const info = (await r.json()) as { content?: string };
+      try {
+        return JSON.parse(deBase64(info.content ?? "")) as StatusOpenFinance;
+      } catch {
+        return null;
+      }
+    },
+
+    async buscarNoBanco(): Promise<void> {
+      const r = await pedir(`/actions/workflows/${TAREFA_OPEN_FINANCE}/dispatches`, {
+        method: "POST",
+        body: JSON.stringify({ ref: "main" }),
+      });
+      if (r.ok) return;
+      if (r.status === 404) {
+        throw new Error(
+          "A busca no banco ainda não está instalada no repositório dos dados (falta o arquivo da tarefa).",
+        );
+      }
+      if (r.status === 403) {
+        throw new Error(
+          'A chave não pode iniciar a busca. No GitHub, edite a chave e dê a permissão "Actions: Read and write".',
+        );
+      }
+      throw falha(r);
     },
   };
 }
@@ -261,6 +296,11 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
 
   return {
     modo: "github",
+
+    openFinance: {
+      status: () => arquivo().lerStatusOpenFinance(),
+      buscarAgora: () => arquivo().buscarNoBanco(),
+    },
 
     conexao: {
       atual() {
