@@ -63,17 +63,41 @@ const EXTRAS: Record<string, Categoria> = {
   presente: { id: "presente", nome: "Presente", icone: Gift },
   ajuste: { id: "ajuste", nome: "Ajuste de saldo", icone: Scale },
   transferencia: { id: "transferencia", nome: "Transferência", icone: ArrowLeftRight },
+  tarifa: { id: "tarifa", nome: "Tarifas e juros", icone: Landmark },
 };
 
 /** Palavras que sugerem a categoria de uma compra importada do banco. */
 const PISTAS: [string, RegExp][] = [
-  ["mercado", /mercad|supermerc|atacad|assai|carrefour|extra |pao de acucar|hortifrut|sacolao|padaria/],
-  ["transporte", /uber|99 ?(pop|app|taxi)|cabify|posto|combust|shell|ipiranga|petrobr|estacion|metro|onibus|bilhete|sem parar|conectcar|pedagio/],
-  ["saude", /farm|drog|raia|pacheco|panvel|clinic|hospital|laborat|odonto|medic|academia|smart ?fit|bluefit|unimed|amil/],
-  ["assinatura", /netflix|spotify|disney|hbo|max\.com|prime video|amazon prime|youtube|apple\.com|icloud|google (one|storage)|deezer|globoplay|paramount|chatgpt|openai/],
-  ["alimentacao", /ifood|rappi|restaur|lanch|burger|mc ?donald|pizza|sushi|cafe|bar |padoca|aiqfome|delivery/],
+  // Antes de tudo: o que não é compra de verdade.
+  ["tarifa", /\biof\b|anuidade|seguro cart|tarifa|juros|encargo|multa por atraso/],
+  // Pagar conta ou mandar Pix com o cartão (RecargaPay e parecidos).
+  ["transferencia", /recarga ?pay|pix (no|via|com o?) ?cart/],
+  // "Mercadolivre" e "Mercado Pago" não são supermercado.
+  [
+    "mercado",
+    /supermerc|\bmercado\b(?! ?(livre|pago))|mercadinho|atacad|assai|carrefour|extra |pao de acucar|hortifrut|sacolao|padaria/,
+  ],
+  [
+    "transporte",
+    /uber|99 ?(pop|app|taxi)|cabify|posto|combust|shell|ipiranga|petrobr|estacion|metro|onibus|bilhete|sem parar|conectcar|pedagio/,
+  ],
+  [
+    "saude",
+    /farm|drog|raia|pacheco|panvel|clinic|hospital|laborat|odonto|medic|academia|smart ?fit|bluefit|unimed|amil/,
+  ],
+  [
+    "assinatura",
+    /netflix|spotify|disney|hbo|max\.com|prime video|amazon prime|youtube|apple\.com|icloud|google (one|storage)|deezer|globoplay|paramount|chatgpt|openai|telegram|discord|canva|notion|duolingo|dropbox|adobe|crunchyroll/,
+  ],
+  [
+    "alimentacao",
+    /ifood|rappi|restaur|lanch|burger|mc ?donald|pizza|sushi|cafe|bar |padoca|aiqfome|delivery/,
+  ],
   ["lazer", /cinema|ingresso|show|steam|playstation|xbox|nintendo|teatro|parque/],
-  ["compras", /amazon|mercado ?livre|magalu|magazine|shopee|shein|americanas|renner|riachuelo|c&a|zara|loja/],
+  [
+    "compras",
+    /amazon|mercado ?livre|magalu|magazine|shopee|shein|americanas|renner|riachuelo|c&a|zara|loja/,
+  ],
   ["educacao", /curso|escola|faculd|universid|udemy|alura|livrar|livro|papelar/],
   ["internet", /vivo|claro|tim |oi |net virtua|internet|telefon/],
   ["luz", /enel|light|cemig|copel|celesc|energia|eletropaulo|coelba|celpe/],
@@ -81,17 +105,10 @@ const PISTAS: [string, RegExp][] = [
 ];
 
 export function sugerirCategoria(descricao: string): string {
-  const texto = descricao
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+  const texto = descricao.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
   return PISTAS.find(([, regra]) => regra.test(texto))?.[0] ?? "outros";
 }
 
 export function categoria(id: string): Categoria {
-  return (
-    CATEGORIAS.find((c) => c.id === id) ??
-    EXTRAS[id] ??
-    CATEGORIAS[CATEGORIAS.length - 1]
-  );
+  return CATEGORIAS.find((c) => c.id === id) ?? EXTRAS[id] ?? CATEGORIAS[CATEGORIAS.length - 1];
 }

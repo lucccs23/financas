@@ -267,6 +267,10 @@ export function categoriaDaPluggy(
   }
   const regras: [RegExp, string][] = [
     [/credit card payment/, "cartao"],
+    [
+      /bank fees|credit card fees|account fees|atm fees|interest|late payment|overdraft|tax on financial/,
+      "tarifa",
+    ],
     [/same person|transfer|boleto|bank slip|\bpix\b|\bted\b|\bdoc\b/, "transferencia"],
     [/investment|fixed income|mutual fund|variable income|pension|margin/, "reserva"],
     [
@@ -305,6 +309,16 @@ export function categoriaDaPluggy(
   const pelaDescricao = sugerirCategoria(`${descricao} ${extra.comerciante ?? ""}`);
   if (pelaDescricao !== "outros") return pelaDescricao;
   return achada ?? "outros";
+}
+
+/**
+ * Categoria dada pelo app numa busca anterior que vale tentar de novo: "Outros"
+ * e o Mercado Livre que uma versão antiga punha em "Mercado". Uma categoria que
+ * você escolheu não entra aqui.
+ */
+function categoriaParaRever(categoria: string | null | undefined, descricao: string) {
+  const c = categoria ?? "outros";
+  return c === "outros" || (c === "mercado" && /mercado ?livre/i.test(descricao));
 }
 
 /** O que a Pluggy sabe do estabelecimento, para escolher a categoria. */
@@ -427,7 +441,11 @@ function aplicarConta(
     if (jaVieram.has(t.id)) {
       // Ficou em "Outros" numa busca anterior: tenta de novo. A sua escolha fica.
       const antiga = banco.transacoes.find((x) => x.externoId === t.id);
-      if (antiga && antiga.categoria === "outros" && antiga.tipo === "saida") {
+      if (
+        antiga &&
+        antiga.tipo === "saida" &&
+        categoriaParaRever(antiga.categoria, antiga.descricao)
+      ) {
         antiga.categoria = categoriaDaPluggy(
           t.category,
           t.description,
@@ -763,7 +781,7 @@ function aplicarCartao(
       existente.valor = valor;
       // Ficou em "Outros" numa busca anterior: tenta de novo com o que o banco
       // sabe do estabelecimento. Uma categoria que você escolheu fica.
-      if ((existente.categoria ?? "outros") === "outros") {
+      if (categoriaParaRever(existente.categoria, existente.descricao)) {
         existente.categoria = categoriaDaPluggy(
           t.category,
           t.description,

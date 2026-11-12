@@ -552,6 +552,15 @@ describe("Open Finance", () => {
     expect(d2.cartoes.map((c) => c.nome)).toEqual(["Nubank Gold", "Nubank Ultravioleta"]);
   });
 
+  it("RecargaPay é transferência, Mercado Livre não é supermercado, IOF é tarifa", () => {
+    expect(categoriaDaPluggy("Services", "Recargapay *Lucasmart", "saida")).toBe("transferencia");
+    expect(categoriaDaPluggy(null, "MERCADOLIVRE*LOJA", "saida")).toBe("compras");
+    expect(categoriaDaPluggy(null, "Confianca Max", "saida")).not.toBe("assinatura");
+    expect(categoriaDaPluggy(null, "Supermercado Tauste", "saida")).toBe("mercado");
+    expect(categoriaDaPluggy(null, "IOF de compra internacional", "saida")).toBe("tarifa");
+    expect(categoriaDaPluggy(null, "Dl *Sgl Telegram Premium", "saida")).toBe("assinatura");
+  });
+
   it("arruma o nome do cartão que vem todo em maiúsculas ou minúsculas", () => {
     expect(nomeBonito("GOLD")).toBe("Gold");
     expect(nomeBonito("gold")).toBe("Gold");
