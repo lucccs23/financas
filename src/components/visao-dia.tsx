@@ -158,7 +158,13 @@ export function AindaPodeGastar() {
     <Painel className="flex h-full flex-col overflow-hidden">
       <div className="p-4 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <TituloPainel>{passou ? "Passou do dia a dia em" : "Ainda pode gastar"}</TituloPainel>
+          <TituloPainel>
+            {ritmo.orcamento === 0
+              ? "Gastos do dia a dia"
+              : passou
+                ? "Passou do dia a dia em"
+                : "Ainda pode gastar"}
+          </TituloPainel>
           <BotaoIcone
             icone={Plus}
             rotulo="Lançar um gasto"
@@ -169,9 +175,19 @@ export function AindaPodeGastar() {
         </div>
         {ritmo.orcamento === 0 ? (
           <div className="mt-4">
+            {/* Sem limite definido: mostra o que já foi gasto e convida a definir. */}
+            {ritmo.gasto > 0 && (
+              <>
+                <Valor centavos={ritmo.gasto} className="text-[34px] leading-none" />
+                <p className="mt-2 mb-4 text-[13px]/5 text-ink-3">
+                  gastos no dia a dia em {nomeMes(mes).toLowerCase()}
+                </p>
+              </>
+            )}
             <p className="text-[13px] leading-5 text-ink-3">
-              Defina quanto quer gastar por mês no dia a dia (lanche, transporte, farmácia) e lance
-              os gastos em Transações para acompanhar o ritmo.
+              {ritmo.gasto > 0
+                ? "Defina um limite para o dia a dia e o app mostra quanto ainda pode gastar e o ritmo do mês."
+                : "Defina quanto quer gastar por mês no dia a dia (lanche, transporte, farmácia) e lance os gastos em Transações para acompanhar o ritmo."}
             </p>
             <Link href="/renda" className={cx(classesBotao("secundario", "sm"), "mt-4")}>
               Definir em Minha renda
