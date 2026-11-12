@@ -61,6 +61,8 @@ interface AppCtx {
   hoje: string;
   mesHoje: Mes;
   mes: Mes;
+  /** Mês da fatura em aberto (no mês de hoje) ou o próprio mês escolhido. */
+  mesFatura: Mes;
   setMes: (mes: Mes) => void;
 
   /** Tema que está valendo agora (o "automático" já resolvido). */
@@ -110,12 +112,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dados, setDados] = useState<Dados>(dadosVazios);
   const [hoje, setHoje] = useState("");
   const [mes, setMes] = useState<Mes>("");
-  /** A pessoa já escolheu um mês: daí em diante o app não muda o mês sozinho. */
-  const mesEscolhido = useRef(false);
-  const escolherMes = useCallback((m: Mes) => {
-    mesEscolhido.current = true;
-    setMes(m);
-  }, []);
   const [aparencia, definirAparencia] = useState<Aparencia>(APARENCIA_PADRAO);
   const [escuroNoSistema, setEscuroNoSistema] = useState(false);
   const [ocultarValores, definirOcultar] = useState(false);
@@ -192,15 +188,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, [backend, avisar]);
 
-  // Ao abrir, mostra o mês das próximas contas: se as faturas deste mês já
-  // estão pagas (ou já venceram todas), o seguinte. Só enquanto a pessoa não
-  // escolheu um mês nem mexeu em nada, para a tela não pular no meio do uso.
-  useEffect(() => {
-    if (estado !== "pronto" || !sessao || !hoje) return;
-    if (mesEscolhido.current || mexidas.current > 0) return;
-    const alvo = mesDeReferencia(dados, sessao.userId, hoje);
-    setMes((m) => (m === alvo ? m : alvo));
-  }, [estado, dados, sessao, hoje]);
+  // Fatura dos cartões a mostrar: no mês de hoje, a que está em aberto (se as
+  // deste mês já estão pagas ou venceram, a do mês seguinte); em outro mês,
+  // a daquele mês. Transações e o resto seguem o mês escolhido.
+  const mesFatura = useMemo(
+    () =>
+      sessao && hoje && mes === hoje.slice(0, 7) ? mesDeReferencia(dados, sessao.userId, hoje) : mes,
+    [dados, sessao, hoje, mes],
+  );
 
   // Versão online: guarda o app no aparelho para abrir na hora (public/sw.js).
   useEffect(() => {
@@ -503,7 +498,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hoje,
     mesHoje: hoje.slice(0, 7),
     mes,
-    setMes: escolherMes,
+    mesFatura,
+    setMes,
     tema,
     setTema,
     aparencia,

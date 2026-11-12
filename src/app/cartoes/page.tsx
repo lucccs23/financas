@@ -14,7 +14,7 @@ import {
 } from "@/lib/calc";
 import { formatar, porcento } from "@/lib/dinheiro";
 import { addMes, dataBR, intervalo, mesEixo, nomeMes } from "@/lib/meses";
-import type { Id } from "@/lib/types";
+import type { Id, Mes } from "@/lib/types";
 import { CartaoVisual } from "@/components/cartao-visual";
 import { Carrossel } from "@/components/carrossel";
 import { Colunas, Progresso } from "@/components/graficos";
@@ -35,7 +35,11 @@ import {
 } from "@/components/ui";
 
 export default function PaginaCartoes() {
-  const { dados, mes, mesHoje, setMes, marcarPago } = useApp();
+  const { dados, mes: mesGlobal, mesFatura, mesHoje, marcarPago } = useApp();
+  // Fatura mostrada: a em aberto (no mês de hoje) ou a do mês escolhido no topo;
+  // clicar num mês do gráfico escolhe só aqui dentro.
+  const [escolha, setEscolha] = useState<{ base: Mes; mes: Mes } | null>(null);
+  const mes = escolha && escolha.base === mesGlobal ? escolha.mes : mesFatura;
   const perfil = usePerfil();
   const { abrir } = useModais();
   const info = useInfoCartao();
@@ -77,7 +81,8 @@ export default function PaginaCartoes() {
   const linhas = comprasDaFatura(cartao.id, dados.compras, mes);
   const lim = limiteDoCartao(cartao, dados, mesHoje);
   const itemFatura = itensDoMes(dados, mes).find((i) => i.chave === `fatura:${cartao.id}`);
-  const meses = intervalo(mes, 6);
+  // Começa no mês do topo, para dar para abrir também a fatura dele (já paga).
+  const meses = intervalo(mesGlobal < mes ? mesGlobal : mes, 6);
   const mesMin = nomeMes(mes).toLowerCase();
 
   return (
@@ -317,7 +322,7 @@ export default function PaginaCartoes() {
             rotulo={`Faturas do cartão ${cartao.nome} nos próximos seis meses`}
             altura={190}
             selecionado={mes}
-            onEscolher={setMes}
+            onEscolher={(m) => setEscolha({ base: mesGlobal, mes: m })}
             series={[{ id: "fatura", rotulo: "Fatura", cor: "var(--seg-pessoal)" }]}
             grupos={meses.map((m) => ({
               chave: m,

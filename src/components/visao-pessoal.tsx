@@ -25,11 +25,13 @@ import {
   resumoMoradia,
   resumoPessoal,
   souPagador,
+  type ItemMes,
 } from "@/lib/calc";
 import { salarioDiferente, salarioRecebido } from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { formatar, porcento } from "@/lib/dinheiro";
-import { nomeMes } from "@/lib/meses";
+import { dataBR, nomeMes } from "@/lib/meses";
+import type { Mes } from "@/lib/types";
 import { BarraFina, Medidor } from "./graficos";
 import { Ilustracao } from "./ilustracao";
 import { useModais } from "./modais-contexto";
@@ -245,37 +247,54 @@ export function SaldoPrevisto() {
 
 /* ───────────────────────── Contas a pagar ───────────────────────── */
 
+/** Data de vencimento de um item (AAAA-MM-DD), no mês a que ele pertence. */
+const vencimentoDe = (i: ItemMes & { mesRef: Mes }) =>
+  `${i.mesRef}-${String(i.dia).padStart(2, "0")}`;
+
 export function ContasAPagar() {
-  const { dados, mes, mesHoje, hoje, eu, marcarPago } = useApp();
+  const { dados, mes, mesFatura, mesHoje, hoje, eu, marcarPago } = useApp();
   const perfil = usePerfil();
   const { abrir } = useModais();
-  // O filtro de dia vale só para o mês em que foi escolhido.
-  const [filtro, setFiltro] = useState<{ mes: string; dia: number } | null>(null);
-  const diaSel = filtro && filtro.mes === mes ? filtro.dia : null;
-  const setDiaSel = (dia: number | null) => setFiltro(dia === null ? null : { mes, dia });
+  // O filtro de dia (uma data de vencimento) vale só para o mês em que foi escolhido.
+  const [filtro, setFiltro] = useState<{ mes: string; data: string } | null>(null);
+  const diaSel = filtro && filtro.mes === mes ? filtro.data : null;
+  const setDiaSel = (data: string | null) => setFiltro(data === null ? null : { mes, data });
 
-  const itens = useMemo(
-    () =>
-      itensDoMes(dados, mes).filter(
-        (i) => i.natureza === "despesa" && souPagador(i, perfil.id, eu?.id ?? null),
-      ),
-    [dados, mes, perfil.id, eu],
-  );
+  // Contas do mês escolhido. Faturas: no mês de hoje, as que estão em aberto
+  // (podem ser do mês seguinte, quando as deste mês já foram pagas).
+  const itens = useMemo(() => {
+    const meu = (i: ItemMes) =>
+      i.natureza === "despesa" && souPagador(i, perfil.id, eu?.id ?? null);
+    const doMes = itensDoMes(dados, mes)
+      .filter((i) => meu(i) && (i.refTipo !== "fatura" || mesFatura === mes))
+      .map((i) => ({ ...i, mesRef: mes }));
+    const faturas =
+      mesFatura === mes
+        ? []
+        : itensDoMes(dados, mesFatura)
+            .filter((i) => i.refTipo === "fatura" && meu(i))
+            .map((i) => ({ ...i, mesRef: mesFatura }));
+    return [...doMes, ...faturas].sort(
+      (a, b) => vencimentoDe(a).localeCompare(vencimentoDe(b)) || a.nome.localeCompare(b.nome),
+    );
+  }, [dados, mes, mesFatura, perfil.id, eu]);
 
   const abertas = itens.filter((i) => !i.pago);
   const falta = abertas.reduce((s, i) => s + i.valor, 0);
   const total = itens.reduce((s, i) => s + i.valor, 0);
-  const dias = [...new Set(itens.map((i) => i.dia))];
-  const lista = diaSel === null ? itens : itens.filter((i) => i.dia === diaSel);
+  const dias = [...new Set(itens.map(vencimentoDe))];
+  const lista = diaSel === null ? itens : itens.filter((i) => vencimentoDe(i) === diaSel);
 
   let quando: string | null = null;
   if (mes === mesHoje && abertas.length) {
-    const diaHoje = Number(hoje.slice(8, 10));
-    const atrasadas = abertas.filter((i) => i.dia < diaHoje).length;
-    const proxima = abertas.find((i) => i.dia >= diaHoje);
+    const atrasadas = abertas.filter((i) => vencimentoDe(i) < hoje).length;
+    const proxima = abertas.find((i) => vencimentoDe(i) >= hoje);
     if (atrasadas) quando = atrasadas === 1 ? "1 atrasada" : `${atrasadas} atrasadas`;
     else if (proxima) {
-      const d = proxima.dia - diaHoje;
+      const d = Math.round(
+        (Date.parse(`${vencimentoDe(proxima)}T12:00:00Z`) - Date.parse(`${hoje}T12:00:00Z`)) /
+          86_400_000,
+      );
       quando = d === 0 ? "vence hoje" : d === 1 ? "vence amanhã" : `em ${d} dias`;
     }
   }
@@ -285,7 +304,7 @@ export function ContasAPagar() {
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <TituloPainel
-            detalhe={diaSel === null ? undefined : `dia ${String(diaSel).padStart(2, "0")}`}
+            detalhe={diaSel === null ? undefined : `dia ${diaSel.slice(8)}`}
           >
             Contas a pagar
           </TituloPainel>
@@ -340,7 +359,8 @@ export function ContasAPagar() {
             className="sem-rolagem -mx-1 mt-6 flex gap-2 overflow-x-auto px-1 py-1"
           >
             {dias.map((d) => {
-              const doDia = itens.filter((i) => i.dia === d);
+              const doDia = itens.filter((i) => vencimentoDe(i) === d);
+              const deOutroMes = d.slice(0, 7) !== mes;
               const ativo = diaSel === d;
               const quitado = doDia.every((i) => i.pago);
               return (
@@ -349,7 +369,8 @@ export function ContasAPagar() {
                   type="button"
                   role="radio"
                   aria-checked={ativo}
-                  aria-label={`Dia ${d}: ${doDia.length} ${doDia.length === 1 ? "conta" : "contas"}`}
+                  aria-label={`Dia ${d.slice(8)}${deOutroMes ? ` de ${nomeMes(d.slice(0, 7)).toLowerCase()}` : ""}: ${doDia.length} ${doDia.length === 1 ? "conta" : "contas"}`}
+                  title={deOutroMes ? `Vence em ${dataBR(d)}` : undefined}
                   onClick={() => setDiaSel(ativo ? null : d)}
                   className={cx(
                     "flex h-14 min-w-14 shrink-0 flex-col items-center justify-center gap-1 rounded-2xl border transition-all duration-150",
@@ -359,7 +380,11 @@ export function ContasAPagar() {
                   )}
                 >
                   <span className="tabular text-[15px] leading-none font-semibold">
-                    {String(d).padStart(2, "0")}
+                    {d.slice(8)}
+                    {/* Fatura em aberto de outro mês: o mês junto do dia. */}
+                    {deOutroMes && (
+                      <span className="text-[10px] font-medium opacity-70">/{d.slice(5, 7)}</span>
+                    )}
                   </span>
                   <span className="flex h-2 items-center gap-1">
                     {quitado ? (
@@ -392,11 +417,11 @@ export function ContasAPagar() {
                 <Marcador
                   marcado={i.pago}
                   rotulo={i.pago ? `Desmarcar ${i.nome}` : `Marcar ${i.nome} como paga`}
-                  onMudar={(v) => marcarPago(i, mes, v)}
+                  onMudar={(v) => marcarPago(i, i.mesRef, v)}
                 />
                 <button
                   type="button"
-                  onClick={() => abrir({ tipo: "ocorrencia", item: i, mes })}
+                  onClick={() => abrir({ tipo: "ocorrencia", item: i, mes: i.mesRef })}
                   className="-my-1 flex min-w-0 flex-1 items-center gap-4 rounded-lg py-1 text-left"
                 >
                   <span className="min-w-0 flex-1">
@@ -410,7 +435,9 @@ export function ContasAPagar() {
                     </span>
                     {diaSel === null && (
                       <span className="block text-xs text-ink-3">
-                        dia {String(i.dia).padStart(2, "0")}
+                        {i.mesRef === mes
+                          ? `dia ${String(i.dia).padStart(2, "0")}`
+                          : `vence ${dataBR(vencimentoDe(i)).slice(0, 5)} · em aberto`}
                         {i.escopo === "casa" && " · da casa"}
                       </span>
                     )}

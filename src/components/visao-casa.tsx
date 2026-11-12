@@ -335,7 +335,8 @@ export function useInfoCartao() {
 }
 
 export function CartoesResumo() {
-  const { dados, mes } = useApp();
+  // Fatura em aberto (no mês de hoje) ou a do mês escolhido.
+  const { dados, mesFatura: mes } = useApp();
   const perfil = usePerfil();
   const { abrir } = useModais();
   const info = useInfoCartao();
