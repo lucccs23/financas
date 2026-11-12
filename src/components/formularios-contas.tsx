@@ -12,7 +12,7 @@ import {
   valorParcela,
   type ItemMes,
 } from "@/lib/calc";
-import { CATEGORIAS, categoria, sugerirCategoria } from "@/lib/categorias";
+import { CATEGORIAS, CATEGORIAS_DE_COMPRA, categoria, sugerirCategoria } from "@/lib/categorias";
 import { novoId } from "@/lib/dados/backend";
 import { formatar } from "@/lib/dinheiro";
 import { addMes, anoDe, dataBR, nomeMes, NOMES_MESES, numeroDe } from "@/lib/meses";
@@ -1040,9 +1040,9 @@ export function FormCompra({
             setCatEscolhida(true);
           }}
         >
-          {(CATEGORIAS.some((c) => c.id === cat)
-            ? CATEGORIAS
-            : [...CATEGORIAS, categoria(cat)]
+          {(CATEGORIAS_DE_COMPRA.some((c) => c.id === cat)
+            ? CATEGORIAS_DE_COMPRA
+            : [...CATEGORIAS_DE_COMPRA, categoria(cat)]
           ).map((c) => (
             <option key={c.id} value={c.id}>
               {c.nome}

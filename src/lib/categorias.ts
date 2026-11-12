@@ -65,7 +65,22 @@ const EXTRAS: Record<string, Categoria> = {
   ajuste: { id: "ajuste", nome: "Ajuste de saldo", icone: Scale },
   transferencia: { id: "transferencia", nome: "Transferência", icone: ArrowLeftRight },
   tarifa: { id: "tarifa", nome: "Tarifas e juros", icone: Landmark },
+  "para-voce": { id: "para-voce", nome: "Para você mesmo", icone: ArrowLeftRight },
 };
+
+/**
+ * Dinheiro que você mandou para você mesmo com o cartão (Pix pelo RecargaPay
+ * e parecidos). Conta como gasto normalmente (você paga a fatura); a categoria
+ * só separa esse dinheiro das transferências para outras pessoas.
+ */
+export const PARA_VOCE = "para-voce";
+
+/** Categorias de uma compra no cartão: as normais e as de dinheiro mandado. */
+export const CATEGORIAS_DE_COMPRA: Categoria[] = [
+  ...CATEGORIAS,
+  EXTRAS.transferencia,
+  EXTRAS["para-voce"],
+];
 
 /** Palavras que sugerem a categoria de uma compra importada do banco. */
 const PISTAS: [string, RegExp][] = [

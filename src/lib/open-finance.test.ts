@@ -5,6 +5,7 @@ import {
   aplicarOpenFinance,
   buscaParada,
   categoriaDaPluggy,
+  paraVoceMesmo,
   categoriaDoMcc,
   entreContasDoDono,
   nomeBonito,
@@ -627,5 +628,16 @@ describe("Open Finance", () => {
     expect(semParcela("MERCADO LIVRE 02/12")).toBe("MERCADO LIVRE");
     expect(semParcela("LOJA PARC 3 de 6")).toBe("LOJA");
     expect(semParcela("PADARIA 2000")).toBe("PADARIA 2000");
+  });
+});
+
+describe("Pix para você mesmo pelo cartão", () => {
+  it("RecargaPay com o começo do seu nome é para você mesmo", () => {
+    expect(paraVoceMesmo("Recargapay *Lucasmart", ["LUCAS M MARTINEZ", "Lucas"])).toBe(true);
+    expect(paraVoceMesmo("RECARGAPAY *LUCASMART", [null, "Lucas"])).toBe(true);
+  });
+  it("de outra pessoa, ou sem RecargaPay, não", () => {
+    expect(paraVoceMesmo("Recargapay *Marianaca", ["Lucas Martins Martinez", "Lucas"])).toBe(false);
+    expect(paraVoceMesmo("Mercadolivre*Lucasmart", ["Lucas"])).toBe(false);
   });
 });

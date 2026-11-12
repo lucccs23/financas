@@ -26,7 +26,7 @@ import {
   valorParcela,
 } from "./calc";
 import { saldoCarteira } from "./calc-extra";
-import { sugerirCategoria } from "./categorias";
+import { PARA_VOCE, sugerirCategoria } from "./categorias";
 import { novoId } from "./dados/backend";
 import { addMes } from "./meses";
 import type { Carteira, Cartao, Compra, Conta, Dados, Id, Mes, Transacao } from "./types";
@@ -370,6 +370,22 @@ function soMudaDeLugar(categoria: string | null | undefined) {
  * conta (mesmo CPF ou mesmo nome completo), mesmo quando o banco não classifica
  * como "same person transfer".
  */
+/**
+ * Pix pago com o cartão para você mesmo (RecargaPay mostra "Recargapay
+ * *Lucasmart", com o começo do nome de quem pagou). Conta como gasto (você
+ * paga a fatura); só fica numa categoria própria.
+ */
+export function paraVoceMesmo(descricao: string, nomes: (string | null | undefined)[]): boolean {
+  const m = normalizar(descricao).match(/recarga ?pay\s*\*\s*([a-z]{4,})/);
+  if (!m) return false;
+  const apelido = m[1];
+  return nomes.some((n) => {
+    const junto = normalizar(n ?? "").replace(/[^a-z]/g, "");
+    const primeiro = normalizar(n ?? "").split(" ")[0] ?? "";
+    return junto.length >= 4 && (junto.startsWith(apelido) || (primeiro.length >= 3 && apelido.startsWith(primeiro)));
+  });
+}
+
 export function entreContasDoDono(t: TransacaoPluggy, conta: ContaPluggy): boolean {
   const outro = t.type === "CREDIT" ? t.paymentData?.payer : t.paymentData?.receiver;
   const digitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
@@ -679,6 +695,11 @@ function aplicarCartao(
 ) {
   const { perfilId } = conexao;
   const credito = conta.creditData ?? {};
+  const nomesDoDono = [conta.owner, banco.perfis.find((p) => p.id === perfilId)?.nome];
+  const categoriaDaCompra = (t: TransacaoPluggy) =>
+    paraVoceMesmo(t.description, nomesDoDono)
+      ? PARA_VOCE
+      : categoriaDaPluggy(t.category, t.description, "saida", doEstabelecimento(t));
   let cartao = banco.cartoes.find((c) => c.externoId === conta.id);
   // O cartão se chama pelo banco ("Nubank", "Inter"). O nome comercial
   // ("Gold", "Platinum") só entra quando o mesmo banco tem mais de um cartão.
@@ -848,12 +869,12 @@ function aplicarCartao(
       // Ficou em "Outros" numa busca anterior: tenta de novo com o que o banco
       // sabe do estabelecimento. Uma categoria que você escolheu fica.
       if (categoriaParaRever(existente.categoria, existente.descricao)) {
-        existente.categoria = categoriaDaPluggy(
-          t.category,
-          t.description,
-          "saida",
-          doEstabelecimento(t),
-        );
+        existente.categoria = categoriaDaCompra(t);
+      }
+      // Pix para você mesmo que entrou antes como "Transferência" (a categoria
+      // automática de antes) ganha a categoria própria.
+      if (existente.categoria === "transferencia" && categoriaDaCompra(t) === PARA_VOCE) {
+        existente.categoria = PARA_VOCE;
       }
       continue;
     }
@@ -884,7 +905,7 @@ function aplicarCartao(
       mesPrimeira,
       mesFim: null,
       data: compradoEm,
-      categoria: categoriaDaPluggy(t.category, t.description, "saida", doEstabelecimento(t)),
+      categoria: categoriaDaCompra(t),
       externoId: chave,
     } satisfies Compra);
     resumo.compras++;
