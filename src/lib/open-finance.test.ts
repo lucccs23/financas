@@ -5,6 +5,7 @@ import {
   aplicarOpenFinance,
   categoriaDaPluggy,
   categoriaDoMcc,
+  entreContasDoDono,
   nomeBonito,
   nomeDoBanco,
   semParcela,
@@ -81,6 +82,38 @@ describe("Open Finance", () => {
     expect(r2).toMatchObject({ carteirasNovas: 0, transacoes: 0 });
     expect(d.transacoes).toHaveLength(2);
     expect(saldoCarteira(carteira, d.transacoes)).toBe(123_456);
+  });
+
+  it("dinheiro entre contas suas (mesmo nome ou CPF) fica só no saldo, sem virar renda", () => {
+    const minha = { ...corrente, owner: "Lucas Martins Martinez", taxNumber: "123.456.789-00" };
+    const deMim = tx({
+      id: "m1",
+      amount: 20,
+      description: "Transferência Recebida|LUCAS MARTINS MARTINEZ",
+      category: "Transfer - PIX",
+    });
+    const daIrma = tx({
+      id: "m2",
+      amount: 63,
+      description: "Transferência Recebida|Mariane Caroline Martinez",
+      category: "Transfer - PIX",
+      paymentData: { payer: { name: "Mariane Caroline Martinez", documentNumber: { value: "987.654.321-00" } } },
+    });
+    const pixPraMim = tx({
+      id: "m3",
+      amount: -90,
+      description: "Pix enviado",
+      paymentData: { receiver: { name: "Outro Nome", documentNumber: { value: "12345678900" } } },
+    });
+    expect(entreContasDoDono(deMim, minha)).toBe(true);
+    expect(entreContasDoDono(daIrma, minha)).toBe(false);
+    expect(entreContasDoDono(pixPraMim, minha)).toBe(true);
+
+    const d = base();
+    aplicarOpenFinance(d, conexao([{ conta: minha, transacoes: [deMim, daIrma, pixPraMim] }]), HOJE);
+    const so = (id: string) => d.transacoes.find((t) => t.externoId === id)?.soSaldo;
+    expect([so("m1"), so("m2"), so("m3")]).toEqual([true, false, true]);
+    expect(movimentoAvulso(d.transacoes, "eu", "2026-11").entradas).toBe(6300);
   });
 
   it("ignora o que ainda está pendente no banco", () => {

@@ -26,6 +26,7 @@ import { Ilustracao } from "./ilustracao";
 import { useModais } from "./modais-contexto";
 import {
   Botao,
+  classesBotao,
   cx,
   Etiqueta,
   Ladrilho,
@@ -128,7 +129,12 @@ export function SaldoPrevisto() {
           rotulo="Para onde vai a renda do mês"
           partes={[
             { id: "casa", rotulo: "Sua parte da casa", valor: r.parteCasa, cor: "var(--seg-casa)" },
-            { id: "pessoal", rotulo: "Contas pessoais", valor: r.pessoais, cor: "var(--seg-pessoal)" },
+            {
+              id: "pessoal",
+              rotulo: "Contas pessoais",
+              valor: r.pessoais,
+              cor: "var(--seg-pessoal)",
+            },
             { id: "dia", rotulo: "Dia a dia", valor: r.diaADia, cor: "var(--seg-dia)" },
             { id: "sobra", rotulo: "Sobra", valor: Math.max(0, r.sobra), cor: "var(--seg-sobra)" },
           ]}
@@ -150,13 +156,16 @@ export function SaldoPrevisto() {
             </Link>
           }
         />
-        <ItemLegenda
-          cor="var(--seg-casa)"
-          rotulo={lar ? "Sua parte da casa" : "Casa (sem casa ainda)"}
-          valor={r.parteCasa}
-          fracao={fr(r.parteCasa)}
-          prefixo="− "
-        />
+        {/* Sem casa e sem gasto da casa: não há o que mostrar. */}
+        {(lar || r.parteCasa > 0) && (
+          <ItemLegenda
+            cor="var(--seg-casa)"
+            rotulo="Sua parte da casa"
+            valor={r.parteCasa}
+            fracao={fr(r.parteCasa)}
+            prefixo="− "
+          />
+        )}
         <ItemLegenda
           cor="var(--seg-pessoal)"
           rotulo="Contas pessoais"
@@ -164,13 +173,15 @@ export function SaldoPrevisto() {
           fracao={fr(r.pessoais)}
           prefixo="− "
         />
-        <ItemLegenda
-          cor="var(--seg-dia)"
-          rotulo="Dia a dia"
-          valor={r.diaADia}
-          fracao={fr(r.diaADia)}
-          prefixo="− "
-        />
+        {r.diaADia > 0 && (
+          <ItemLegenda
+            cor="var(--seg-dia)"
+            rotulo="Dia a dia"
+            valor={r.diaADia}
+            fracao={fr(r.diaADia)}
+            prefixo="− "
+          />
+        )}
         <ItemLegenda
           cor={falta ? "var(--bad)" : "var(--seg-sobra)"}
           rotulo={falta ? "= Falta" : "= Sobra"}
@@ -240,7 +251,10 @@ export function ContasAPagar() {
             {quando && (
               <>
                 <span
-                  className={cx("font-medium", quando.includes("atrasada") ? "text-bad-text" : "text-ink-2")}
+                  className={cx(
+                    "font-medium",
+                    quando.includes("atrasada") ? "text-bad-text" : "text-ink-2",
+                  )}
                 >
                   {quando}
                 </span>
@@ -301,15 +315,17 @@ export function ContasAPagar() {
                     {quitado ? (
                       <Check size={12} strokeWidth={3.5} className={ativo ? "" : "text-good"} />
                     ) : (
-                      doDia.slice(0, 5).map((i) => (
-                        <span
-                          key={i.chave}
-                          className={cx(
-                            "h-1 w-1 rounded-full",
-                            ativo ? "bg-white" : i.pago ? "bg-line-strong" : "bg-primary",
-                          )}
-                        />
-                      ))
+                      doDia
+                        .slice(0, 5)
+                        .map((i) => (
+                          <span
+                            key={i.chave}
+                            className={cx(
+                              "h-1 w-1 rounded-full",
+                              ativo ? "bg-white" : i.pago ? "bg-line-strong" : "bg-primary",
+                            )}
+                          />
+                        ))
                     )}
                   </span>
                 </button>
@@ -387,6 +403,27 @@ export function Moradia() {
   const acima = r.fracao !== null && r.fracao > REFERENCIA_MORADIA;
   const cor = acima ? "var(--warn)" : "var(--good)";
 
+  // Nada marcado como moradia: um convite curto, sem medidor nem R$ 0,00.
+  if (r.itens.length === 0) {
+    return (
+      <Painel className="p-4 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <TituloPainel>Moradia</TituloPainel>
+            <p className="mt-4 text-[13px]/5 text-ink-3">
+              Marque aluguel, condomínio, luz e parecidas como &quot;Gasto de moradia&quot; para ver
+              quanto do salário vai para morar (a referência é até {porcento(REFERENCIA_MORADIA)}).
+            </p>
+            <Link href="/contas" className={cx(classesBotao("secundario", "sm"), "mt-4")}>
+              Ir para Contas
+            </Link>
+          </div>
+          <Ilustracao painel="moradia" icone={House} tom="ciano" tamanho={64} />
+        </div>
+      </Painel>
+    );
+  }
+
   return (
     <Painel className="p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -414,9 +451,7 @@ export function Moradia() {
                   {acima ? <TriangleAlert size={16} /> : <Check size={16} strokeWidth={3} />}
                   {porcento(r.fracao)} {base === "meu" ? "do salário" : "dos salários"}
                 </span>
-                <span className="text-ink-3">
-                  referência: até {porcento(REFERENCIA_MORADIA)}
-                </span>
+                <span className="text-ink-3">referência: até {porcento(REFERENCIA_MORADIA)}</span>
               </>
             )}
           </p>
@@ -457,8 +492,8 @@ export function Moradia() {
       <p className="mt-6 text-xs font-semibold text-ink">O que entra na conta</p>
       {r.itens.length === 0 ? (
         <p className="mt-2 text-[13px] leading-5 text-ink-3">
-          Nada ainda. Ao cadastrar aluguel, condomínio, luz e parecidas, ligue a opção
-          &quot;Gasto de moradia&quot;.
+          Nada ainda. Ao cadastrar aluguel, condomínio, luz e parecidas, ligue a opção &quot;Gasto
+          de moradia&quot;.
         </p>
       ) : (
         <ul className="mt-4 grid grid-cols-2 gap-x-4 gap-y-4">

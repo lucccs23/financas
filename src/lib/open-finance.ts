@@ -40,6 +40,9 @@ export interface ContaPluggy {
   name: string;
   marketingName?: string | null;
   balance: number;
+  /** Dono da conta (nome e CPF), para reconhecer dinheiro entre contas dele. */
+  owner?: string | null;
+  taxNumber?: string | null;
   /** transferNumber costuma vir como "código do banco/agência/conta" (ex.: "077/0001/123-4"). */
   bankData?: { transferNumber?: string | null } | null;
   creditData?: {
@@ -58,6 +61,11 @@ export interface TransacaoPluggy {
   type: "DEBIT" | "CREDIT";
   status?: "PENDING" | "POSTED";
   category?: string | null;
+  /** Quem pagou e quem recebeu (Pix, TED): nome e documento. */
+  paymentData?: {
+    payer?: ParteDoPagamento | null;
+    receiver?: ParteDoPagamento | null;
+  } | null;
   /** Estabelecimento: nome e o tipo de negócio. */
   merchant?: {
     name?: string | null;
@@ -74,6 +82,11 @@ export interface TransacaoPluggy {
     /** Mês da fatura (AAAA-MM) em que esta cobrança cai. */
     billForecastDate?: string | null;
   } | null;
+}
+
+interface ParteDoPagamento {
+  name?: string | null;
+  documentNumber?: { value?: string | null } | null;
 }
 
 /** Uma conexão (um banco no Meu Pluggy), já ligada a um perfil do app. */
@@ -347,6 +360,24 @@ function soMudaDeLugar(categoria: string | null | undefined) {
   );
 }
 
+/**
+ * Dinheiro entre contas da mesma pessoa: o outro lado do Pix/TED é o dono da
+ * conta (mesmo CPF ou mesmo nome completo), mesmo quando o banco não classifica
+ * como "same person transfer".
+ */
+export function entreContasDoDono(t: TransacaoPluggy, conta: ContaPluggy): boolean {
+  const outro = t.type === "CREDIT" ? t.paymentData?.payer : t.paymentData?.receiver;
+  const digitos = (v: string | null | undefined) => (v ?? "").replace(/\D/g, "");
+  const meuCpf = digitos(conta.taxNumber);
+  const cpfDoOutro = digitos(outro?.documentNumber?.value);
+  if (meuCpf.length === 11 && cpfDoOutro === meuCpf) return true;
+  const dono = normalizar(conta.owner ?? "");
+  // Nome completo (duas palavras ou mais), para não confundir parentes.
+  if (dono.split(" ").length < 2) return false;
+  if (outro?.name && normalizar(outro.name) === dono) return true;
+  return normalizar(t.description).includes(dono);
+}
+
 function ehSalario(categoria: string | null | undefined) {
   return /salary|pro-labore|retirement/.test(normalizar(categoria ?? ""));
 }
@@ -441,6 +472,10 @@ function aplicarConta(
     if (jaVieram.has(t.id)) {
       // Ficou em "Outros" numa busca anterior: tenta de novo. A sua escolha fica.
       const antiga = banco.transacoes.find((x) => x.externoId === t.id);
+      if (antiga && !antiga.soSaldo && entreContasDoDono(t, conta)) {
+        antiga.soSaldo = true;
+        antiga.observacao ||= "Entre contas suas";
+      }
       if (
         antiga &&
         antiga.tipo === "saida" &&
@@ -480,6 +515,10 @@ function aplicarConta(
 
     let soSaldo = soMudaDeLugar(t.category);
     let observacao = "";
+    if (!soSaldo && entreContasDoDono(t, conta)) {
+      soSaldo = true;
+      observacao = "Entre contas suas";
+    }
     if (tipo === "entrada" && ehSalario(t.category) && rendaNoMes(perfil, mes).salario > 0) {
       soSaldo = true;
       observacao = "Salário (já está em Minha renda)";
