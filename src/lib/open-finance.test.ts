@@ -247,6 +247,155 @@ describe("Open Finance", () => {
     expect(d.carteiras[0].nome).toBe("Minha conta");
   });
 
+  describe("faturas como os bancos mandam", () => {
+    const HOJE2 = "2026-11-12";
+    const compra = (
+      id: string,
+      date: string,
+      amount: number,
+      rotulo: string,
+      extra: Partial<TransacaoPluggy> = {},
+    ): TransacaoPluggy =>
+      tx({
+        id,
+        date,
+        amount,
+        type: "DEBIT",
+        description: `LOJA ${id}`,
+        status: date >= "2026-10-31" ? "PENDING" : "POSTED",
+        creditCardMetadata: { billForecastDate: rotulo },
+        ...extra,
+      });
+    const cartaoSemFechamento = (dueDate: string): ContaPluggy => ({
+      ...cartao,
+      creditData: { creditLimit: 5000, availableCreditLimit: 4000, balanceCloseDate: null, balanceDueDate: dueDate },
+    });
+
+    it("Inter: rótulo é o mês anterior ao vencimento; a fatura aberta (pendente) vai para dezembro", () => {
+      const d = base();
+      const inter = [
+        compra("a", "2026-10-01", 50, "2026-10"),
+        compra("b", "2026-10-07", 83.82, "2026-10"),
+        compra("c", "2026-11-01", 300, "2026-11"),
+        compra("d", "2026-11-07", 271.6, "2026-11"),
+      ];
+      aplicarOpenFinance(
+        d,
+        conexao([{ conta: cartaoSemFechamento("2026-11-07"), transacoes: inter }]),
+        HOJE2,
+      );
+      const k = d.cartoes[0];
+      expect(faturaDoMes(k.id, d.compras, "2026-12")).toBe(57_160);
+      expect(faturaDoMes(k.id, d.compras, "2026-11")).toBe(13_382);
+    });
+
+    it("Nubank: fechamento descoberto pelas compras (30) e rótulo já é o mês do vencimento", () => {
+      const d = base();
+      const nubank = [
+        compra("a", "2026-10-29", 100, "2026-11"),
+        compra("b", "2026-10-30", 20, "2026-11"),
+        compra("c", "2026-10-31", 200, "2026-12"),
+        compra("d", "2026-11-10", 300, "2026-12"),
+      ];
+      aplicarOpenFinance(
+        d,
+        conexao([{ conta: cartaoSemFechamento("2026-11-09"), transacoes: nubank }]),
+        HOJE2,
+      );
+      const k = d.cartoes[0];
+      expect(k).toMatchObject({ diaFechamento: 30, diaVencimento: 9 });
+      expect(faturaDoMes(k.id, d.compras, "2026-12")).toBe(50_000);
+    });
+
+    it("corrige o fechamento que veio do chute antigo, mas não um dia que você ajustou", () => {
+      const d = base();
+      const conta = cartaoSemFechamento("2026-11-09");
+      const mp = [compra("a", "2026-11-02", 10, "2026-11"), compra("b", "2026-11-06", 20, "2026-12")];
+      aplicarOpenFinance(d, conexao([{ conta, transacoes: [] }]), HOJE2);
+      expect(d.cartoes[0].diaFechamento).toBe(3); // sem compras: o chute antigo
+      aplicarOpenFinance(d, conexao([{ conta, transacoes: mp }]), HOJE2);
+      expect(d.cartoes[0].diaFechamento).toBe(2);
+      d.cartoes[0].diaFechamento = 5;
+      aplicarOpenFinance(d, conexao([{ conta, transacoes: mp }]), HOJE2);
+      expect(d.cartoes[0].diaFechamento).toBe(5);
+    });
+
+    it("compra que sai de pendente para lançada (com outro id) não se repete; cancelada sai", () => {
+      const d = base();
+      const conta = cartaoSemFechamento("2026-11-09");
+      aplicarOpenFinance(
+        d,
+        conexao([
+          {
+            conta,
+            transacoes: [
+              compra("p1", "2026-11-05", 42, "2026-12"),
+              compra("p2", "2026-11-06", 10, "2026-12"),
+              compra("p3", "2026-11-06", 10, "2026-12"),
+            ],
+          },
+        ]),
+        HOJE2,
+      );
+      expect(d.compras).toHaveLength(3);
+      // Agora: p1 lançada com outro id, uma das duas de R$ 10 foi cancelada.
+      const r = aplicarOpenFinance(
+        d,
+        conexao([
+          {
+            conta,
+            transacoes: [
+              { ...compra("p1", "2026-11-05", 42, "2026-12"), id: "x1", status: "POSTED" },
+              compra("p2", "2026-11-06", 10, "2026-12"),
+            ],
+          },
+        ]),
+        HOJE2,
+      );
+      expect(r.compras).toBe(0);
+      expect(d.compras.map((c) => c.valor).sort()).toEqual([1000, 4200]);
+    });
+
+    it("pagamento recebido pelo cartão marca a fatura anterior como paga", () => {
+      const d = base();
+      const pagamento = tx({
+        id: "pg",
+        date: "2026-11-09",
+        amount: 3500,
+        type: "CREDIT",
+        description: "Pagamento recebido",
+        status: "POSTED",
+        creditCardMetadata: { billForecastDate: "2026-12" },
+      });
+      aplicarOpenFinance(
+        d,
+        conexao([
+          { conta: cartaoSemFechamento("2026-11-09"), transacoes: [compra("a", "2026-11-05", 10, "2026-12"), pagamento] },
+        ]),
+        HOJE2,
+      );
+      expect(d.lancamentos).toEqual([
+        expect.objectContaining({ refTipo: "fatura", refId: d.cartoes[0].id, mes: "2026-11", pago: true }),
+      ]);
+      expect(d.compras).toHaveLength(1);
+    });
+
+    it("autorização pendente antiga e esquecida não entra", () => {
+      const d = base();
+      aplicarOpenFinance(
+        d,
+        conexao([
+          {
+            conta: cartaoSemFechamento("2026-11-09"),
+            transacoes: [{ ...compra("v", "2026-08-30", 27.25, "2026-09"), status: "PENDING" }],
+          },
+        ]),
+        HOJE2,
+      );
+      expect(d.compras).toHaveLength(0);
+    });
+  });
+
   it("traduz categorias e limpa a parcela da descrição", () => {
     expect(categoriaDaPluggy("Groceries", "ASSAI", "saida")).toBe("mercado");
     expect(categoriaDaPluggy("Gas stations", "SHELL", "saida")).toBe("transporte");

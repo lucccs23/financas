@@ -259,7 +259,9 @@ function ehSalario(categoria: string | null | undefined) {
 function ehPagamentoDeFatura(categoria: string | null | undefined, descricao: string) {
   return (
     /credit card payment/.test(normalizar(categoria ?? "")) ||
-    /pag(amento|to)?\.? ?(de )?fatura|fatura (do )?cart/.test(normalizar(descricao))
+    /pag(amento|to)?\.? ?(de )?fatura|fatura (do )?cart|pagamento recebido|pgto recebido|pagto recebido/.test(
+      normalizar(descricao),
+    )
   );
 }
 
@@ -289,11 +291,17 @@ export function aplicarOpenFinance(
     if (!banco.perfis.some((p) => p.id === perfilId)) continue;
 
     for (const { conta, transacoes } of conexao.contas) {
-      const postadas = transacoes.filter((t) => t.status !== "PENDING" && t.amount !== 0);
+      const comValor = transacoes.filter((t) => t.amount !== 0);
       if (conta.type === "CREDIT") {
-        aplicarCartao(banco, conexao, conta, postadas, hoje, mesHoje, resumo);
+        aplicarCartao(banco, conexao, conta, comValor, hoje, mesHoje, resumo);
       } else {
-        aplicarConta(banco, conexao, conta, postadas, resumo);
+        aplicarConta(
+          banco,
+          conexao,
+          conta,
+          comValor.filter((t) => t.status !== "PENDING"),
+          resumo,
+        );
       }
     }
   }
@@ -402,11 +410,83 @@ function aplicarConta(
   carteira.saldoInicial = Math.round(conta.balance * 100) - movimento;
 }
 
+const ehMes = (m: string | null | undefined): m is string => !!m && /^\d{4}-\d{2}$/.test(m);
+
+function somarDias(iso: string, n: number) {
+  return new Date(Date.parse(`${iso}T12:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Compra (ou estorno) do cartão que entra no app. Pagamento da fatura não entra. */
+function ehCompra(t: TransacaoPluggy) {
+  return !(t.type === "CREDIT" && ehPagamentoDeFatura(t.category, t.description));
+}
+
+/**
+ * Cada banco rotula a fatura de um jeito (uns pelo mês do vencimento, outros
+ * pelo mês anterior). O app usa o mês do vencimento. Descobre, pela fatura
+ * aberta hoje, quantos meses somar ao rótulo do banco.
+ */
+export function deslocamentoDoRotulo(
+  transacoes: TransacaoPluggy[],
+  cartao: Pick<Cartao, "diaFechamento" | "diaVencimento">,
+  hoje: string,
+): number {
+  const aVista = transacoes.filter(
+    (t) =>
+      t.type === "DEBIT" &&
+      (t.creditCardMetadata?.installmentNumber ?? 1) <= 1 &&
+      ehMes(t.creditCardMetadata?.billForecastDate) &&
+      data(t.date) <= hoje,
+  );
+  if (!aVista.length) return 0;
+  const maisRecente = aVista.reduce((a, b) => (data(b.date) > data(a.date) ? b : a));
+  const rotulo = maisRecente.creditCardMetadata!.billForecastDate!;
+  // Vencimento da fatura aberta hoje, pelas regras do cartão no app.
+  const vencimento = mesPrimeiraFatura(cartao, hoje);
+  return diffMeses(rotulo, vencimento);
+}
+
+function diffMeses(de: Mes, ate: Mes) {
+  const [a1, m1] = de.split("-").map(Number);
+  const [a2, m2] = ate.split("-").map(Number);
+  return (a2 - a1) * 12 + (m2 - m1);
+}
+
+/**
+ * Dia de fechamento quando o banco não informa: a última compra da fatura
+ * anterior ou, se faltar compra perto da virada, o dia antes da primeira
+ * compra da fatura aberta.
+ */
+export function fechamentoPelasCompras(
+  transacoes: TransacaoPluggy[],
+  hoje: string,
+): { dia: number; certo: boolean } | null {
+  const porRotulo = new Map<string, string[]>();
+  for (const t of transacoes) {
+    const m = t.creditCardMetadata;
+    if (t.type !== "DEBIT" || (m?.installmentNumber ?? 1) > 1 || !ehMes(m?.billForecastDate)) continue;
+    const dias = porRotulo.get(m!.billForecastDate!) ?? [];
+    dias.push(data(t.date));
+    porRotulo.set(m!.billForecastDate!, dias);
+  }
+  const rotulos = [...porRotulo.keys()].sort();
+  const aberta = rotulos.filter((r) => porRotulo.get(r)!.some((d) => d <= hoje)).pop();
+  if (!aberta) return null;
+  const primeiraAberta = porRotulo.get(aberta)!.sort()[0];
+  const anterior = porRotulo.get(addMes(aberta, -1))?.sort().at(-1);
+  // Compras dos dois lados da virada, poucos dias entre elas: dá para confiar.
+  if (anterior && diasEntre(anterior, primeiraAberta) <= 5) return { dia: dia(anterior), certo: true };
+  return { dia: dia(somarDias(primeiraAberta, -1)), certo: false };
+}
+
+/** O chute antigo, quando o banco não informava o fechamento (até a versão de 12/11/2026). */
+const chuteAntigo = (vencimento: number) => ((vencimento + 23) % 30) + 1;
+
 function aplicarCartao(
   banco: Dados,
   conexao: ConexaoBuscada,
   conta: ContaPluggy,
-  transacoes: TransacaoPluggy[],
+  todas: TransacaoPluggy[],
   hoje: string,
   mesHoje: Mes,
   resumo: ResumoImportacao,
@@ -414,10 +494,20 @@ function aplicarCartao(
   const { perfilId } = conexao;
   const credito = conta.creditData ?? {};
   let cartao = banco.cartoes.find((c) => c.externoId === conta.id);
-  const fechamento = dia(credito.balanceCloseDate);
-  const vencimento = dia(credito.balanceDueDate);
+
+  // Pendente no cartão é compra da fatura aberta (ou parcela futura): entra.
+  // Autorização pendente antiga e esquecida, não.
+  const limitePendente = somarDias(hoje, -45);
+  const transacoes = todas.filter(
+    (t) =>
+      t.status !== "PENDING" ||
+      (t.creditCardMetadata?.totalInstallments ?? 1) > 1 ||
+      data(t.date) >= limitePendente,
+  );
 
   if (!cartao) {
+    // Fechamento e vencimento só no cadastro: depois, vale o que você ajustar no app.
+    const vencimento = dia(credito.balanceDueDate) || 10;
     cartao = {
       id: novoId(),
       perfilId,
@@ -426,8 +516,11 @@ function aplicarCartao(
       banco: conexao.banco,
       cor: banco.cartoes.filter((c) => c.perfilId === perfilId).length % 7,
       limite: centavos(credito.creditLimit),
-      diaFechamento: fechamento || (vencimento ? ((vencimento + 23) % 30) + 1 : 1),
-      diaVencimento: vencimento || 10,
+      diaFechamento:
+        dia(credito.balanceCloseDate) ||
+        fechamentoPelasCompras(transacoes, hoje)?.dia ||
+        chuteAntigo(vencimento),
+      diaVencimento: vencimento,
       externoId: conta.id,
     } satisfies Cartao;
     banco.cartoes.push(cartao);
@@ -437,18 +530,45 @@ function aplicarCartao(
       cartao.banco = conexao.banco;
     }
     if (credito.creditLimit != null) cartao.limite = centavos(credito.creditLimit);
-    if (fechamento) cartao.diaFechamento = fechamento;
-    if (vencimento) cartao.diaVencimento = vencimento;
+    // Cartão criado com o chute antigo de fechamento: corrige uma vez, se as
+    // compras mostrarem a virada com clareza. Um dia que você ajustou fica.
+    if (cartao.diaFechamento === chuteAntigo(cartao.diaVencimento)) {
+      const pelasCompras = fechamentoPelasCompras(transacoes, hoje);
+      if (pelasCompras?.certo) cartao.diaFechamento = pelasCompras.dia;
+    }
   }
   const doCartao = cartao;
+  const deslocamento = deslocamentoDoRotulo(transacoes, doCartao, hoje);
+  const mesDaFatura = (t: TransacaoPluggy) => {
+    const rotulo = t.creditCardMetadata?.billForecastDate;
+    return ehMes(rotulo) ? addMes(rotulo, deslocamento) : mesPrimeiraFatura(doCartao, data(t.date));
+  };
 
-  const jaVieram = new Set(banco.compras.map((c) => c.externoId).filter(Boolean));
-
+  // Pagamento da fatura feito ao cartão: a fatura anterior está paga.
   for (const t of transacoes) {
-    const meta = t.creditCardMetadata ?? {};
-    // Pagamento da fatura recebido pelo cartão: já aparece no extrato da conta.
-    if (t.type === "CREDIT" && ehPagamentoDeFatura(t.category, t.description)) continue;
+    if (ehCompra(t) || t.status === "PENDING") continue;
+    const paga = addMes(mesDaFatura(t), -1);
+    if (paga < mesHoje || paga === mesHoje) {
+      const ja = banco.lancamentos.find(
+        (l) => l.refTipo === "fatura" && l.refId === doCartao.id && l.mes === paga && l.pago,
+      );
+      if (!ja) {
+        marcarPago(banco, "fatura", doCartao.id, paga, doCartao);
+        resumo.pagas++;
+      }
+    }
+  }
 
+  // Chave estável de cada compra: não muda quando sai de "pendente" para
+  // "lançada" (o id do banco pode mudar). Compras iguais no mesmo dia ganham #2, #3...
+  const vistas = new Map<string, number>();
+  const ordenadas = [...transacoes].filter(ehCompra).sort(
+    (a, b) => data(a.date).localeCompare(data(b.date)) || a.id.localeCompare(b.id),
+  );
+  const chaves = new Set<string>();
+
+  for (const t of ordenadas) {
+    const meta = t.creditCardMetadata ?? {};
     const parcelas = Math.max(1, meta.totalInstallments ?? 1);
     const numero = Math.min(parcelas, Math.max(1, meta.installmentNumber ?? 1));
     const parcela = centavos(t.amount);
@@ -461,18 +581,30 @@ function aplicarCartao(
     const valor = t.type === "CREDIT" ? -total : total; // estorno abate da fatura
     const descricao = semParcela(t.description.trim()) || t.description.trim();
     const compradoEm = data(meta.purchaseDate) || data(t.date);
-    const mesFatura =
-      meta.billForecastDate && /^\d{4}-\d{2}$/.test(meta.billForecastDate)
-        ? meta.billForecastDate
-        : mesPrimeiraFatura(doCartao, data(t.date));
-    const mesPrimeira = addMes(mesFatura, -(numero - 1));
+    const mesPrimeira = addMes(mesDaFatura(t), -(numero - 1));
 
     // Uma compra parcelada aparece uma vez por fatura: a chave é a compra, não a parcela.
-    const chave =
-      parcelas > 1
-        ? `${conta.id}|${compradoEm}|${total}|${parcelas}|${normalizar(descricao)}`
-        : t.id;
-    if (jaVieram.has(chave)) continue;
+    let chave = `${conta.id}|${compradoEm}|${valor}|${parcelas}|${normalizar(descricao)}`;
+    if (parcelas === 1) {
+      const n = (vistas.get(chave) ?? 0) + 1;
+      vistas.set(chave, n);
+      if (n > 1) chave += `#${n}`;
+    }
+    if (chaves.has(chave)) continue;
+    chaves.add(chave);
+
+    // Já veio antes (pela chave nova ou pelo id do banco, das primeiras buscas)?
+    const existente = banco.compras.find(
+      (c) => c.cartaoId === doCartao.id && (c.externoId === chave || c.externoId === t.id),
+    );
+    if (existente) {
+      existente.externoId = chave;
+      // O banco manda: fatura e valor seguem o que ele informa.
+      existente.mesPrimeira = mesPrimeira;
+      existente.valor = valor;
+      existente.parcelas = parcelas;
+      continue;
+    }
 
     const manual = banco.compras.find(
       (c) =>
@@ -484,7 +616,6 @@ function aplicarCartao(
     );
     if (manual) {
       manual.externoId = chave;
-      jaVieram.add(chave);
       resumo.ligadas++;
       continue;
     }
@@ -504,9 +635,20 @@ function aplicarCartao(
       categoria: categoriaDaPluggy(t.category, t.description, "saida"),
       externoId: chave,
     } satisfies Compra);
-    jaVieram.add(chave);
     resumo.compras++;
   }
+
+  // Compra à vista que veio do banco e sumiu dele (autorização cancelada) sai
+  // também daqui, mas só das faturas ainda em aberto, que a busca cobre inteiras.
+  const abertaDesde = mesPrimeiraFatura(doCartao, hoje);
+  banco.compras = banco.compras.filter(
+    (c) =>
+      c.cartaoId !== doCartao.id ||
+      !c.externoId ||
+      c.parcelas > 1 ||
+      c.mesPrimeira < abertaDesde ||
+      chaves.has(c.externoId),
+  );
 
   // Limite livre igual ao do banco.
   if (credito.availableCreditLimit != null && doCartao.limite > 0) {
