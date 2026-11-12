@@ -224,8 +224,13 @@ chave secreta da Pluggy fica só nos segredos desse repositório, nunca no site.
 - Cada conta do banco vira uma **carteira**, com o saldo igual ao do banco.
 - Cada cartão vira um **cartão**, com limite, fechamento e vencimento do banco,
   e o limite livre igual ao do app do banco.
-- Extrato vira **Transações**; compras do cartão viram **compras** (a parcelada
-  entra uma vez só, com todas as parcelas).
+- Extrato vira **Transações**. No cartão, cada lançamento do banco (inclusive
+  cada parcela, como "Loja · parcela 3/10") entra na fatura que o banco indica,
+  e as compras ainda pendentes da fatura aberta também entram: a fatura do app
+  soma o mesmo que o banco manda. Compra cancelada no banco sai do app.
+- O que acabou de acontecer pode levar até um dia para chegar: o Meu Pluggy
+  atualiza os bancos uma vez por dia. Saldo de fatura anterior paga em parte não
+  aparece como lançamento.
 - Nada entra duas vezes. O que você já tinha lançado à mão é reconhecido (mesmo
   valor, data próxima) e ligado ao banco em vez de repetido.
 - O que já conta em outro lugar entra como **só saldo** (fica no extrato e no
