@@ -19,6 +19,7 @@ import {
   conferirCartoes,
   type ConexaoBuscada,
   type ContaPluggy,
+  type FaturaOficial,
   nomeDoBanco,
   type StatusOpenFinance,
   type TransacaoPluggy,
@@ -38,7 +39,11 @@ export interface ConexaoNoCache {
   situacao: StatusOpenFinance["conexoes"][number]["situacao"];
   atualizadoNoBancoEm: string | null;
   erro: string | null;
-  contas: { conta: ContaPluggy; transacoes: TransacaoPluggy[] }[];
+  contas: {
+    conta: ContaPluggy;
+    transacoes: TransacaoPluggy[];
+    faturas?: FaturaOficial[];
+  }[];
 }
 
 /**
@@ -53,18 +58,27 @@ export function lerConfiguracao(
     .map((linha) => linha.trim())
     .filter((linha) => linha && !linha.startsWith("#"))
     .map((linha) => {
-      const [item, perfil = "", apelido = ""] = linha.split(/[=:]/).map((p) => p.trim());
+      const [item, perfil = "", apelido = ""] = linha
+        .split(/[=:]/)
+        .map((p) => p.trim());
       return { item, perfil, apelido };
     })
     .filter((c) => /^[0-9a-f-]{20,}$/i.test(c.item));
 }
 
-const semAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const semAcento = (t: string) =>
+  t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
-function situacaoDoItem(status: string | undefined): ConexaoNoCache["situacao"] {
+function situacaoDoItem(
+  status: string | undefined,
+): ConexaoNoCache["situacao"] {
   if (status === "UPDATED") return "ok";
   if (status === "UPDATING") return "atualizando";
-  if (status === "LOGIN_ERROR" || status === "OUTDATED" || status === "WAITING_USER_INPUT") {
+  if (
+    status === "LOGIN_ERROR" ||
+    status === "OUTDATED" ||
+    status === "WAITING_USER_INPUT"
+  ) {
     return "reconectar";
   }
   return "erro";
@@ -88,7 +102,9 @@ async function pluggy<T>(
         method: init.method ?? "GET",
         headers: {
           ...(chave ? { "X-API-KEY": chave } : {}),
-          ...(init.body !== undefined ? { "content-type": "application/json" } : {}),
+          ...(init.body !== undefined
+            ? { "content-type": "application/json" }
+            : {}),
         },
         body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
       });
@@ -100,15 +116,26 @@ async function pluggy<T>(
       await esperar(1000 * 3 ** tentativa);
       continue;
     }
-    if (!r) throw new Error("Sem conexão com a Pluggy. Tente de novo mais tarde.");
-    if ((r.status === 404 || r.status === 403) && caminho.startsWith("/items/")) {
+    if (!r)
+      throw new Error("Sem conexão com a Pluggy. Tente de novo mais tarde.");
+    if (
+      (r.status === 404 || r.status === 403) &&
+      caminho.startsWith("/items/")
+    ) {
       throw new ConexaoDeOutraAplicacao();
     }
     if (!r.ok) {
       // A Pluggy explica o erro no corpo da resposta ("message", "codeDescription").
-      const corpo = (await r.json().catch(() => ({}))) as { message?: string; codeDescription?: string };
-      const motivo = [corpo.codeDescription, corpo.message].filter(Boolean).join(": ");
-      throw new Error(`A Pluggy respondeu com erro ${r.status}${motivo ? ` (${motivo})` : ""}.`);
+      const corpo = (await r.json().catch(() => ({}))) as {
+        message?: string;
+        codeDescription?: string;
+      };
+      const motivo = [corpo.codeDescription, corpo.message]
+        .filter(Boolean)
+        .join(": ");
+      throw new Error(
+        `A Pluggy respondeu com erro ${r.status}${motivo ? ` (${motivo})` : ""}.`,
+      );
     }
     return (await r.json()) as T;
   }
@@ -180,14 +207,18 @@ async function atualizarNosBancos(chave: string, itens: string[]) {
   while (pendentes.size && Date.now() < limite) {
     await esperar(5000);
     for (const item of [...pendentes]) {
-      const dados = await pluggy<ItemPluggy>(chave, `/items/${item}`).catch(() => null);
+      const dados = await pluggy<ItemPluggy>(chave, `/items/${item}`).catch(
+        () => null,
+      );
       if (dados && dados.status !== "UPDATING") pendentes.delete(item);
     }
   }
   const prontas = pedidos.filter(Boolean).length - pendentes.size;
   console.log(
     `Atualização nos bancos: ${prontas} de ${itens.length} conexão(ões) prontas` +
-      (pendentes.size ? `, ${pendentes.size} ainda atualizando (fica para a próxima busca).` : "."),
+      (pendentes.size
+        ? `, ${pendentes.size} ainda atualizando (fica para a próxima busca).`
+        : "."),
   );
 }
 
@@ -196,7 +227,8 @@ async function buscar(cache: string) {
   if (!clientId || !process.env.PLUGGY_CLIENT_SECRET)
     throw new Error("Faltam PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET.");
   const config = lerConfiguracao(process.env.PLUGGY_CONEXOES ?? "");
-  if (!config.length) throw new Error("PLUGGY_CONEXOES está vazia: informe os ids das conexões.");
+  if (!config.length)
+    throw new Error("PLUGGY_CONEXOES está vazia: informe os ids das conexões.");
 
   // Entra em cada aplicação. A chave do pedido de login não existe ainda:
   // "pluggy()" vai sem ela. Uma aplicação recusada não impede as outras.
@@ -209,10 +241,13 @@ async function buscar(cache: string) {
       });
       chaves.push(apiKey);
     } catch (e) {
-      console.log(`${app.nome}: a Pluggy recusou as credenciais (${e instanceof Error ? e.message : e}).`);
+      console.log(
+        `${app.nome}: a Pluggy recusou as credenciais (${e instanceof Error ? e.message : e}).`,
+      );
     }
   }
-  if (!chaves.length) throw new Error("A Pluggy recusou as credenciais de todas as aplicações.");
+  if (!chaves.length)
+    throw new Error("A Pluggy recusou as credenciais de todas as aplicações.");
 
   // Cada conexão é de uma aplicação: acha qual (a primeira que a conhece).
   const chaveDo = new Map<string, string>();
@@ -229,12 +264,16 @@ async function buscar(cache: string) {
     }
   }
 
-  const desde = new Date(Date.now() - DIAS * 86_400_000).toISOString().slice(0, 10);
+  const desde = new Date(Date.now() - DIAS * 86_400_000)
+    .toISOString()
+    .slice(0, 10);
   const conexoes: ConexaoNoCache[] = [];
 
   if (process.env.ATUALIZAR_NO_BANCO) {
     for (const chave of chaves) {
-      const daqui = config.map((c) => c.item).filter((i) => chaveDo.get(i) === chave);
+      const daqui = config
+        .map((c) => c.item)
+        .filter((i) => chaveDo.get(i) === chave);
       if (daqui.length) await atualizarNosBancos(chave, daqui);
     }
   }
@@ -257,7 +296,9 @@ async function buscar(cache: string) {
         process.env.ATUALIZAR_NO_BANCO || !itemDe.has(item)
           ? await pluggy<ItemPluggy>(apiKey, `/items/${item}`)
           : itemDe.get(item)!;
-      const conector = dados.connector?.name?.replace(/^\s*meu\s*pluggy\s*[-–:]?\s*/i, "").trim();
+      const conector = dados.connector?.name
+        ?.replace(/^\s*meu\s*pluggy\s*[-–:]?\s*/i, "")
+        .trim();
       conexao.situacao = situacaoDoItem(dados.status);
       conexao.atualizadoNoBancoEm = dados.lastUpdatedAt ?? null;
 
@@ -269,24 +310,42 @@ async function buscar(cache: string) {
         const transacoes: TransacaoPluggy[] = [];
         let proxima: string | null = `?accountId=${conta.id}&dateFrom=${desde}`;
         while (proxima) {
-          const pagina: { results: TransacaoPluggy[]; next: string | null } = await pluggy(
-            apiKey,
-            `/v2/transactions${proxima}`,
-          );
+          const pagina: { results: TransacaoPluggy[]; next: string | null } =
+            await pluggy(apiKey, `/v2/transactions${proxima}`);
           transacoes.push(...pagina.results);
           proxima = pagina.next;
         }
-        conexao.contas.push({ conta, transacoes });
+        // Cartão: as faturas fechadas, para saber se sobrou saldo sem pagar.
+        let faturas: { dueDate: string; totalAmount: number }[] | undefined;
+        if (conta.type === "CREDIT") {
+          faturas = await pluggy<{
+            results: { dueDate: string; totalAmount: number }[];
+          }>(apiKey, `/bills?accountId=${conta.id}`)
+            .then((r) =>
+              r.results.map((f) => ({
+                dueDate: f.dueDate,
+                totalAmount: f.totalAmount,
+              })),
+            )
+            .catch(() => undefined);
+        }
+        conexao.contas.push({ conta, transacoes, faturas });
       }
       conexao.banco =
-        apelido || nomeDoBanco(contas) || conector || contas[0]?.marketingName?.trim() || "Banco";
+        apelido ||
+        nomeDoBanco(contas) ||
+        conector ||
+        contas[0]?.marketingName?.trim() ||
+        "Banco";
       console.log(
         `Conexão ${conexoes.length}: ${conexao.contas.length} conta(s), ` +
           `${conexao.contas.reduce((s, c) => s + c.transacoes.length, 0)} movimentação(ões).`,
       );
       if (process.env.DIAGNOSTICO) {
         diagnostico(conexao);
-        for (const { conta } of conexao.contas.filter((c) => c.conta.type === "CREDIT")) {
+        for (const { conta } of conexao.contas.filter(
+          (c) => c.conta.type === "CREDIT",
+        )) {
           try {
             const faturas = await pluggy<{
               results: {
@@ -299,7 +358,9 @@ async function buscar(cache: string) {
             }>(apiKey, `/bills?accountId=${conta.id}`);
             // As mais recentes primeiro (a lista não vem em ordem garantida).
             const recentes = [...faturas.results]
-              .sort((a, b) => String(b.dueDate).localeCompare(String(a.dueDate)))
+              .sort((a, b) =>
+                String(b.dueDate).localeCompare(String(a.dueDate)),
+              )
               .slice(0, 4);
             for (const f of recentes) {
               const encargos = (f.financeCharges ?? [])
@@ -310,7 +371,9 @@ async function buscar(cache: string) {
               );
             }
           } catch (e) {
-            console.log(`    faturas oficiais: ${e instanceof Error ? e.message : e}`);
+            console.log(
+              `    faturas oficiais: ${e instanceof Error ? e.message : e}`,
+            );
           }
         }
       }
@@ -320,7 +383,10 @@ async function buscar(cache: string) {
       console.log(`Conexão ${conexoes.length}: ${conexao.erro}`);
     }
   }
-  writeFileSync(cache, JSON.stringify({ buscadoEm: new Date().toISOString(), conexoes }));
+  writeFileSync(
+    cache,
+    JSON.stringify({ buscadoEm: new Date().toISOString(), conexoes }),
+  );
 }
 
 /**
@@ -338,7 +404,10 @@ function diagnostico(conexao: ConexaoNoCache) {
           : ` · saldo=${conta.balance}`),
     );
     if (conta.type !== "CREDIT") continue;
-    const grupos = new Map<string, { n: number; soma: number; de: string; ate: string }>();
+    const grupos = new Map<
+      string,
+      { n: number; soma: number; de: string; ate: string }
+    >();
     for (const t of transacoes) {
       const m = t.creditCardMetadata ?? {};
       const chave = `fatura=${m.billForecastDate ?? "?"} ${t.status ?? "POSTED"} ${t.type}`;
@@ -351,7 +420,9 @@ function diagnostico(conexao: ConexaoNoCache) {
       grupos.set(chave, g);
     }
     for (const [chave, g] of [...grupos].sort()) {
-      console.log(`    ${chave}: ${g.n} · soma=${g.soma.toFixed(2)} · ${g.de}..${g.ate}`);
+      console.log(
+        `    ${chave}: ${g.n} · soma=${g.soma.toFixed(2)} · ${g.de}..${g.ate}`,
+      );
     }
     // Amostra das movimentações recentes, campo a campo.
     const recentes = transacoes
@@ -365,7 +436,7 @@ function diagnostico(conexao: ConexaoNoCache) {
     for (const t of recentes) {
       const m = (t.creditCardMetadata ?? {}) as Record<string, unknown>;
       console.log(
-        `    · ${String(t.date).slice(0, 10)} ${t.status ?? "-"} ${t.type} ${t.amount}` +
+        `    · ${String(t.date).slice(0, 10)} ${t.status ?? "-"} ${t.type} ${t.amount}${t.amountInAccountCurrency != null ? ` (R$ ${t.amountInAccountCurrency})` : ""}` +
           ` parc=${m.installmentNumber ?? "-"}/${m.totalInstallments ?? "-"} tot=${m.totalAmount ?? "-"}` +
           ` compra=${String(m.purchaseDate ?? "-").slice(0, 10)} rot=${m.billForecastDate ?? "-"}` +
           ` post=${m.billPostDate ?? "-"} bill=${String(m.billId ?? "-").slice(0, 8)}` +
@@ -381,7 +452,9 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
     conexoes: ConexaoNoCache[];
   };
   if (!existsSync(arquivo)) {
-    throw new Error("O arquivo de dados ainda não existe: abra o site e crie um perfil antes.");
+    throw new Error(
+      "O arquivo de dados ainda não existe: abra o site e crie um perfil antes.",
+    );
   }
   const banco = normalizarBanco(JSON.parse(readFileSync(arquivo, "utf8")));
 
@@ -393,7 +466,8 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
     // não tira os bancos de quem já usava).
     const ids = new Set(c.contas.map((x) => x.conta.id));
     const dono =
-      banco.carteiras.find((k) => k.externoId && ids.has(k.externoId))?.perfilId ??
+      banco.carteiras.find((k) => k.externoId && ids.has(k.externoId))
+        ?.perfilId ??
       banco.cartoes.find((k) => k.externoId && ids.has(k.externoId))?.perfilId;
     const perfil = c.perfil
       ? banco.perfis.find((p) => semAcento(p.nome) === semAcento(c.perfil))
@@ -440,11 +514,16 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
 async function principal() {
   const [modo, ...args] = process.argv.slice(2);
   if (modo === "buscar" && args[0]) return buscar(args[0]);
-  if (modo === "aplicar" && args.length === 3) return aplicar(args[0], args[1], args[2]);
-  throw new Error("Uso: buscar <cache.json> | aplicar <cache.json> <financas.json> <status.json>");
+  if (modo === "aplicar" && args.length === 3)
+    return aplicar(args[0], args[1], args[2]);
+  throw new Error(
+    "Uso: buscar <cache.json> | aplicar <cache.json> <financas.json> <status.json>",
+  );
 }
 
-if (process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/buscar-no-banco.ts")) {
+if (
+  process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/buscar-no-banco.ts")
+) {
   principal().catch((e) => {
     console.error(e instanceof Error ? e.message : e);
     process.exit(1);

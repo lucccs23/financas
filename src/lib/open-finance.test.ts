@@ -5,7 +5,9 @@ import {
   aplicarOpenFinance,
   buscaParada,
   categoriaDaPluggy,
+  emReais,
   paraVoceMesmo,
+  saldoNaoPago,
   categoriaDoMcc,
   entreContasDoDono,
   nomeBonito,
@@ -21,7 +23,13 @@ const HOJE = "2026-11-11";
 
 function base(): Dados {
   const d = dadosVazios();
-  d.perfis.push({ id: "eu", nome: "Eu", cor: 0, salario: 300_000, orcamentoDiaADia: 50_000 });
+  d.perfis.push({
+    id: "eu",
+    nome: "Eu",
+    cor: 0,
+    salario: 300_000,
+    orcamentoDiaADia: 50_000,
+  });
   return d;
 }
 
@@ -47,7 +55,9 @@ const cartao: ContaPluggy = {
   },
 };
 
-const tx = (t: Partial<TransacaoPluggy> & Pick<TransacaoPluggy, "id" | "amount">): TransacaoPluggy => ({
+const tx = (
+  t: Partial<TransacaoPluggy> & Pick<TransacaoPluggy, "id" | "amount">,
+): TransacaoPluggy => ({
   date: "2026-11-05",
   description: "Algo",
   type: t.amount < 0 ? "DEBIT" : "CREDIT",
@@ -64,14 +74,32 @@ describe("Open Finance", () => {
   it("cria a carteira com o saldo do banco e não repete nada na segunda vez", () => {
     const d = base();
     const extrato = [
-      tx({ id: "a", amount: -42.5, description: "IFOOD *LANCHE", category: "Food delivery" }),
-      tx({ id: "b", amount: 150, description: "PIX RECEBIDO FULANO", category: "Transfer - PIX" }),
+      tx({
+        id: "a",
+        amount: -42.5,
+        description: "IFOOD *LANCHE",
+        category: "Food delivery",
+      }),
+      tx({
+        id: "b",
+        amount: 150,
+        description: "PIX RECEBIDO FULANO",
+        category: "Transfer - PIX",
+      }),
     ];
-    const r1 = aplicarOpenFinance(d, conexao([{ conta: corrente, transacoes: extrato }]), HOJE);
+    const r1 = aplicarOpenFinance(
+      d,
+      conexao([{ conta: corrente, transacoes: extrato }]),
+      HOJE,
+    );
     expect(r1).toMatchObject({ carteirasNovas: 1, transacoes: 2 });
 
     const carteira = d.carteiras[0];
-    expect(carteira).toMatchObject({ nome: "Banco Teste", tipo: "corrente", externoId: "conta-1" });
+    expect(carteira).toMatchObject({
+      nome: "Banco Teste",
+      tipo: "corrente",
+      externoId: "conta-1",
+    });
     expect(saldoCarteira(carteira, d.transacoes)).toBe(123_456);
     expect(d.transacoes.find((t) => t.externoId === "a")).toMatchObject({
       tipo: "saida",
@@ -80,14 +108,22 @@ describe("Open Finance", () => {
       soSaldo: false,
     });
 
-    const r2 = aplicarOpenFinance(d, conexao([{ conta: corrente, transacoes: extrato }]), HOJE);
+    const r2 = aplicarOpenFinance(
+      d,
+      conexao([{ conta: corrente, transacoes: extrato }]),
+      HOJE,
+    );
     expect(r2).toMatchObject({ carteirasNovas: 0, transacoes: 0 });
     expect(d.transacoes).toHaveLength(2);
     expect(saldoCarteira(carteira, d.transacoes)).toBe(123_456);
   });
 
   it("dinheiro entre contas suas (mesmo nome ou CPF) fica só no saldo, sem virar renda", () => {
-    const minha = { ...corrente, owner: "Lucas Martins Martinez", taxNumber: "123.456.789-00" };
+    const minha = {
+      ...corrente,
+      owner: "Lucas Martins Martinez",
+      taxNumber: "123.456.789-00",
+    };
     const deMim = tx({
       id: "m1",
       amount: 20,
@@ -99,21 +135,36 @@ describe("Open Finance", () => {
       amount: 63,
       description: "Transferência Recebida|Mariane Caroline Martinez",
       category: "Transfer - PIX",
-      paymentData: { payer: { name: "Mariane Caroline Martinez", documentNumber: { value: "987.654.321-00" } } },
+      paymentData: {
+        payer: {
+          name: "Mariane Caroline Martinez",
+          documentNumber: { value: "987.654.321-00" },
+        },
+      },
     });
     const pixPraMim = tx({
       id: "m3",
       amount: -90,
       description: "Pix enviado",
-      paymentData: { receiver: { name: "Outro Nome", documentNumber: { value: "12345678900" } } },
+      paymentData: {
+        receiver: {
+          name: "Outro Nome",
+          documentNumber: { value: "12345678900" },
+        },
+      },
     });
     expect(entreContasDoDono(deMim, minha)).toBe(true);
     expect(entreContasDoDono(daIrma, minha)).toBe(false);
     expect(entreContasDoDono(pixPraMim, minha)).toBe(true);
 
     const d = base();
-    aplicarOpenFinance(d, conexao([{ conta: minha, transacoes: [deMim, daIrma, pixPraMim] }]), HOJE);
-    const so = (id: string) => d.transacoes.find((t) => t.externoId === id)?.soSaldo;
+    aplicarOpenFinance(
+      d,
+      conexao([{ conta: minha, transacoes: [deMim, daIrma, pixPraMim] }]),
+      HOJE,
+    );
+    const so = (id: string) =>
+      d.transacoes.find((t) => t.externoId === id)?.soSaldo;
     expect([so("m1"), so("m2"), so("m3")]).toEqual([true, false, true]);
     expect(movimentoAvulso(d.transacoes, "eu", "2026-11").entradas).toBe(6300);
   });
@@ -122,23 +173,47 @@ describe("Open Finance", () => {
     const d = base();
     aplicarOpenFinance(
       d,
-      conexao([{ conta: corrente, transacoes: [tx({ id: "sal", amount: 3000, description: "SALARIO", category: "Salary" })] }]),
+      conexao([
+        {
+          conta: corrente,
+          transacoes: [
+            tx({
+              id: "sal",
+              amount: 3000,
+              description: "SALARIO",
+              category: "Salary",
+            }),
+          ],
+        },
+      ]),
       HOJE,
     );
-    expect(d.transacoes[0]).toMatchObject({ categoria: "salario", soSaldo: true });
+    expect(d.transacoes[0]).toMatchObject({
+      categoria: "salario",
+      soSaldo: true,
+    });
   });
 
   it("avisa quando a busca automática passa de 12 horas sem rodar", () => {
     const agora = Date.parse("2026-11-12T20:00:00Z");
-    expect(buscaParada({ buscadoEm: "2026-11-12T10:00:00Z" }, agora)).toBe(false);
-    expect(buscaParada({ buscadoEm: "2026-11-12T07:00:00Z" }, agora)).toBe(true);
+    expect(buscaParada({ buscadoEm: "2026-11-12T10:00:00Z" }, agora)).toBe(
+      false,
+    );
+    expect(buscaParada({ buscadoEm: "2026-11-12T07:00:00Z" }, agora)).toBe(
+      true,
+    );
   });
 
   it("ignora o que ainda está pendente no banco", () => {
     const d = base();
     aplicarOpenFinance(
       d,
-      conexao([{ conta: corrente, transacoes: [tx({ id: "p", amount: -10, status: "PENDING" })] }]),
+      conexao([
+        {
+          conta: corrente,
+          transacoes: [tx({ id: "p", amount: -10, status: "PENDING" })],
+        },
+      ]),
       HOJE,
     );
     expect(d.transacoes).toHaveLength(0);
@@ -152,20 +227,55 @@ describe("Open Finance", () => {
         {
           conta: corrente,
           transacoes: [
-            tx({ id: "s", amount: 3000, description: "SALARIO", category: "Salary" }),
-            tx({ id: "f", amount: -800, description: "PAGTO FATURA", category: "Credit card payment" }),
-            tx({ id: "i", amount: -500, description: "APLICACAO CDB", category: "Fixed income" }),
-            tx({ id: "m", amount: -200, description: "PIX MINHA POUPANCA", category: "Same person transfer - PIX" }),
-            tx({ id: "g", amount: -30, description: "UBER *TRIP", category: "Taxi and ride-hailing" }),
+            tx({
+              id: "s",
+              amount: 3000,
+              description: "SALARIO",
+              category: "Salary",
+            }),
+            tx({
+              id: "f",
+              amount: -800,
+              description: "PAGTO FATURA",
+              category: "Credit card payment",
+            }),
+            tx({
+              id: "i",
+              amount: -500,
+              description: "APLICACAO CDB",
+              category: "Fixed income",
+            }),
+            tx({
+              id: "m",
+              amount: -200,
+              description: "PIX MINHA POUPANCA",
+              category: "Same person transfer - PIX",
+            }),
+            tx({
+              id: "g",
+              amount: -30,
+              description: "UBER *TRIP",
+              category: "Taxi and ride-hailing",
+            }),
           ],
         },
       ]),
       HOJE,
     );
-    const so = (id: string) => d.transacoes.find((t) => t.externoId === id)?.soSaldo;
-    expect([so("s"), so("f"), so("i"), so("m"), so("g")]).toEqual([true, true, true, true, false]);
+    const so = (id: string) =>
+      d.transacoes.find((t) => t.externoId === id)?.soSaldo;
+    expect([so("s"), so("f"), so("i"), so("m"), so("g")]).toEqual([
+      true,
+      true,
+      true,
+      true,
+      false,
+    ]);
     // Só o Uber entra no resumo do mês.
-    expect(movimentoAvulso(d.transacoes, "eu", "2026-11")).toMatchObject({ entradas: 0, saidas: 3000 });
+    expect(movimentoAvulso(d.transacoes, "eu", "2026-11")).toMatchObject({
+      entradas: 0,
+      saidas: 3000,
+    });
   });
 
   it("marca como paga a conta fixa de mesmo valor e não conta o gasto duas vezes", () => {
@@ -189,14 +299,27 @@ describe("Open Finance", () => {
     });
     const r = aplicarOpenFinance(
       d,
-      conexao([{ conta: corrente, transacoes: [tx({ id: "l", amount: -189.9, description: "ENEL" })] }]),
+      conexao([
+        {
+          conta: corrente,
+          transacoes: [tx({ id: "l", amount: -189.9, description: "ENEL" })],
+        },
+      ]),
       HOJE,
     );
     expect(r.pagas).toBe(1);
     expect(d.lancamentos).toEqual([
-      expect.objectContaining({ refTipo: "conta", refId: "luz", mes: "2026-11", pago: true }),
+      expect.objectContaining({
+        refTipo: "conta",
+        refId: "luz",
+        mes: "2026-11",
+        pago: true,
+      }),
     ]);
-    expect(d.transacoes[0]).toMatchObject({ soSaldo: true, observacao: 'Conta "Luz" (marcada como paga)' });
+    expect(d.transacoes[0]).toMatchObject({
+      soSaldo: true,
+      observacao: 'Conta "Luz" (marcada como paga)',
+    });
   });
 
   it("reconhece o que já foi lançado à mão em vez de repetir", () => {
@@ -215,12 +338,18 @@ describe("Open Finance", () => {
     });
     const r = aplicarOpenFinance(
       d,
-      conexao([{ conta: corrente, transacoes: [tx({ id: "a", amount: -42.5 })] }]),
+      conexao([
+        { conta: corrente, transacoes: [tx({ id: "a", amount: -42.5 })] },
+      ]),
       HOJE,
     );
     expect(r).toMatchObject({ ligadas: 1, transacoes: 0 });
     expect(d.transacoes).toHaveLength(1);
-    expect(d.transacoes[0]).toMatchObject({ id: "manual", externoId: "a", carteiraId: d.carteiras[0].id });
+    expect(d.transacoes[0]).toMatchObject({
+      id: "manual",
+      externoId: "a",
+      carteiraId: d.carteiras[0].id,
+    });
   });
 
   it("cartão: cada parcela entra na fatura que o banco indica, e o limite bate com o banco", () => {
@@ -250,9 +379,27 @@ describe("Open Finance", () => {
             parcela(3, "2026-09"),
             parcela(4, "2026-10"),
             parcela(5, "2026-11"),
-            tx({ id: "uber", amount: 25, type: "DEBIT", date: "2026-11-06", description: "UBER" }),
-            tx({ id: "est", amount: 25, type: "CREDIT", date: "2026-11-07", description: "ESTORNO UBER" }),
-            tx({ id: "pag", amount: 900, type: "CREDIT", description: "PAGAMENTO RECEBIDO", category: "Credit card payment" }),
+            tx({
+              id: "uber",
+              amount: 25,
+              type: "DEBIT",
+              date: "2026-11-06",
+              description: "UBER",
+            }),
+            tx({
+              id: "est",
+              amount: 25,
+              type: "CREDIT",
+              date: "2026-11-07",
+              description: "ESTORNO UBER",
+            }),
+            tx({
+              id: "pag",
+              amount: 900,
+              type: "CREDIT",
+              description: "PAGAMENTO RECEBIDO",
+              category: "Credit card payment",
+            }),
           ],
         },
       ]),
@@ -260,7 +407,11 @@ describe("Open Finance", () => {
     );
     expect(r).toMatchObject({ cartoesNovos: 1, compras: 5 });
     const k = d.cartoes[0];
-    expect(k).toMatchObject({ limite: 500_000, diaFechamento: 3, diaVencimento: 10 });
+    expect(k).toMatchObject({
+      limite: 500_000,
+      diaFechamento: 3,
+      diaVencimento: 10,
+    });
 
     const loja = d.compras.filter((c) => c.descricao.startsWith("LOJA X"));
     expect(loja.map((c) => [c.descricao, c.mesPrimeira, c.valor])).toEqual([
@@ -281,29 +432,86 @@ describe("Open Finance", () => {
   });
 
   it("descobre o nome do banco e troca nomes genéricos (mas não os que você escolheu)", () => {
-    expect(nomeDoBanco([{ name: "Conta", bankData: { transferNumber: "077/0001/1234-5" } }])).toBe("Inter");
     expect(
-      nomeDoBanco([{ name: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" }]),
+      nomeDoBanco([
+        { name: "Conta", bankData: { transferNumber: "077/0001/1234-5" } },
+      ]),
+    ).toBe("Inter");
+    expect(
+      nomeDoBanco([
+        {
+          name: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)",
+        },
+      ]),
     ).toBe("Nubank");
     expect(nomeDoBanco([{ name: "portobank" }])).toBe("Porto Bank");
     // O nome vence o código: a Porto Bank usa o código do Itaú.
-    expect(nomeDoBanco([{ name: "portobank", bankData: { transferNumber: "341/0001/1-2" } }])).toBe(
-      "Porto Bank",
-    );
-    expect(nomeDoBanco([{ name: "Conta corrente", bankData: { transferNumber: "0001/123-4" } }])).toBeNull();
+    expect(
+      nomeDoBanco([
+        { name: "portobank", bankData: { transferNumber: "341/0001/1-2" } },
+      ]),
+    ).toBe("Porto Bank");
+    expect(
+      nomeDoBanco([
+        { name: "Conta corrente", bankData: { transferNumber: "0001/123-4" } },
+      ]),
+    ).toBeNull();
 
     const d = base();
-    const generica = { ...corrente, name: "Nu Pagamentos S.A. (Conta Pré-paga)" };
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Banco", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    const generica = {
+      ...corrente,
+      name: "Nu Pagamentos S.A. (Conta Pré-paga)",
+    };
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Banco",
+          contas: [{ conta: generica, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.carteiras[0].nome).toBe("Banco");
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: generica, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.carteiras[0].nome).toBe("Nubank");
     // Palpite errado de antes ("Itaú") também é corrigido.
     d.carteiras[0].nome = "Itaú";
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: generica, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.carteiras[0].nome).toBe("Nubank");
     d.carteiras[0].nome = "Minha conta";
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: generica, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.carteiras[0].nome).toBe("Minha conta");
   });
 
@@ -328,7 +536,12 @@ describe("Open Finance", () => {
       });
     const cartaoSemFechamento = (dueDate: string): ContaPluggy => ({
       ...cartao,
-      creditData: { creditLimit: 5000, availableCreditLimit: 4000, balanceCloseDate: null, balanceDueDate: dueDate },
+      creditData: {
+        creditLimit: 5000,
+        availableCreditLimit: 4000,
+        balanceCloseDate: null,
+        balanceDueDate: dueDate,
+      },
     });
 
     it("Inter: rótulo é o mês anterior ao vencimento; a fatura aberta (pendente) vai para dezembro", () => {
@@ -341,7 +554,9 @@ describe("Open Finance", () => {
       ];
       aplicarOpenFinance(
         d,
-        conexao([{ conta: cartaoSemFechamento("2026-11-07"), transacoes: inter }]),
+        conexao([
+          { conta: cartaoSemFechamento("2026-11-07"), transacoes: inter },
+        ]),
         HOJE2,
       );
       const k = d.cartoes[0];
@@ -359,7 +574,9 @@ describe("Open Finance", () => {
       ];
       aplicarOpenFinance(
         d,
-        conexao([{ conta: cartaoSemFechamento("2026-11-09"), transacoes: nubank }]),
+        conexao([
+          { conta: cartaoSemFechamento("2026-11-09"), transacoes: nubank },
+        ]),
         HOJE2,
       );
       const k = d.cartoes[0];
@@ -370,7 +587,10 @@ describe("Open Finance", () => {
     it("corrige o fechamento que veio do chute antigo, mas não um dia que você ajustou", () => {
       const d = base();
       const conta = cartaoSemFechamento("2026-11-09");
-      const mp = [compra("a", "2026-11-02", 10, "2026-11"), compra("b", "2026-11-06", 20, "2026-12")];
+      const mp = [
+        compra("a", "2026-11-02", 10, "2026-11"),
+        compra("b", "2026-11-06", 20, "2026-12"),
+      ];
       aplicarOpenFinance(d, conexao([{ conta, transacoes: [] }]), HOJE2);
       expect(d.cartoes[0].diaFechamento).toBe(3); // sem compras: o chute antigo
       aplicarOpenFinance(d, conexao([{ conta, transacoes: mp }]), HOJE2);
@@ -405,7 +625,11 @@ describe("Open Finance", () => {
           {
             conta,
             transacoes: [
-              { ...compra("p1", "2026-11-05", 42, "2026-12"), id: "x1", status: "POSTED" },
+              {
+                ...compra("p1", "2026-11-05", 42, "2026-12"),
+                id: "x1",
+                status: "POSTED",
+              },
               compra("p2", "2026-11-06", 10, "2026-12"),
             ],
           },
@@ -430,12 +654,20 @@ describe("Open Finance", () => {
       aplicarOpenFinance(
         d,
         conexao([
-          { conta: cartaoSemFechamento("2026-11-09"), transacoes: [compra("a", "2026-11-05", 10, "2026-12"), pagamento] },
+          {
+            conta: cartaoSemFechamento("2026-11-09"),
+            transacoes: [compra("a", "2026-11-05", 10, "2026-12"), pagamento],
+          },
         ]),
         HOJE2,
       );
       expect(d.lancamentos).toEqual([
-        expect.objectContaining({ refTipo: "fatura", refId: d.cartoes[0].id, mes: "2026-11", pago: true }),
+        expect.objectContaining({
+          refTipo: "fatura",
+          refId: d.cartoes[0].id,
+          mes: "2026-11",
+          pago: true,
+        }),
       ]);
       expect(d.compras).toHaveLength(1);
     });
@@ -466,11 +698,14 @@ describe("Open Finance", () => {
         ]),
         HOJE2,
       );
-      const pagas = d.lancamentos.filter((l) => l.pago).map((l) => l.mes).sort();
+      const pagas = d.lancamentos
+        .filter((l) => l.pago)
+        .map((l) => l.mes)
+        .sort();
       expect(pagas).toEqual(["2026-10", "2026-11"]);
     });
 
-    it("Inter: \"PAGAMENTO ON LINE\" é pagamento, mesmo classificado como compra", () => {
+    it('Inter: "PAGAMENTO ON LINE" é pagamento, mesmo classificado como compra', () => {
       const d = base();
       const pagamento = tx({
         id: "pg",
@@ -485,7 +720,13 @@ describe("Open Finance", () => {
       aplicarOpenFinance(
         d,
         conexao([
-          { conta: cartaoSemFechamento("2026-11-07"), transacoes: [compra("a", "2026-11-05", 571.6, "2026-11"), pagamento] },
+          {
+            conta: cartaoSemFechamento("2026-11-07"),
+            transacoes: [
+              compra("a", "2026-11-05", 571.6, "2026-11"),
+              pagamento,
+            ],
+          },
         ]),
         HOJE2,
       );
@@ -502,7 +743,13 @@ describe("Open Finance", () => {
       aplicarOpenFinance(
         d,
         conexao([
-          { conta: cartaoSemFechamento("2026-11-07"), transacoes: [compra("a", "2026-11-05", 571.6, "2026-11"), pagamento] },
+          {
+            conta: cartaoSemFechamento("2026-11-07"),
+            transacoes: [
+              compra("a", "2026-11-05", 571.6, "2026-11"),
+              pagamento,
+            ],
+          },
         ]),
         HOJE2,
       );
@@ -541,7 +788,12 @@ describe("Open Finance", () => {
       for (let i = 0; i < 2; i++) {
         aplicarOpenFinance(
           d,
-          conexao([{ conta, transacoes: [parcela(1, "2026-11"), parcela(2, "2026-12")] }]),
+          conexao([
+            {
+              conta,
+              transacoes: [parcela(1, "2026-11"), parcela(2, "2026-12")],
+            },
+          ]),
           HOJE2,
         );
       }
@@ -557,7 +809,12 @@ describe("Open Finance", () => {
         conexao([
           {
             conta: cartaoSemFechamento("2026-11-09"),
-            transacoes: [{ ...compra("v", "2026-08-30", 27.25, "2026-09"), status: "PENDING" }],
+            transacoes: [
+              {
+                ...compra("v", "2026-08-30", 27.25, "2026-09"),
+                status: "PENDING",
+              },
+            ],
           },
         ]),
         HOJE2,
@@ -572,44 +829,106 @@ describe("Open Finance", () => {
     expect(categoriaDoMcc(5912)).toBe("saude");
     expect(categoriaDoMcc(5814)).toBe("alimentacao");
     expect(categoriaDoMcc(9999)).toBeNull();
-    expect(categoriaDaPluggy(null, "PG *XPTO", "saida", { mcc: 5812 })).toBe("alimentacao");
+    expect(categoriaDaPluggy(null, "PG *XPTO", "saida", { mcc: 5812 })).toBe(
+      "alimentacao",
+    );
     // "Shopping" é vago: o MCC de posto vence.
-    expect(categoriaDaPluggy("Shopping", "AUTO POSTO", "saida", { mcc: 5541 })).toBe("transporte");
+    expect(
+      categoriaDaPluggy("Shopping", "AUTO POSTO", "saida", { mcc: 5541 }),
+    ).toBe("transporte");
     // Categoria específica da Pluggy continua valendo.
-    expect(categoriaDaPluggy("Groceries", "X", "saida", { mcc: 5812 })).toBe("mercado");
-    expect(categoriaDaPluggy(null, "LOJA 123", "saida", { ramo: "Pharmacy" })).toBe("saude");
+    expect(categoriaDaPluggy("Groceries", "X", "saida", { mcc: 5812 })).toBe(
+      "mercado",
+    );
+    expect(
+      categoriaDaPluggy(null, "LOJA 123", "saida", { ramo: "Pharmacy" }),
+    ).toBe("saude");
   });
 
   it("cartão se chama pelo banco; o nome comercial só com mais de um cartão no banco", () => {
     const d = base();
     const gold = { ...cartao, id: "nu-gold", marketingName: "gold" };
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: gold, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.cartoes[0].nome).toBe("Nubank");
     // Nome automático de uma versão anterior ("gold") vira o do banco; o seu fica.
     d.cartoes[0].nome = "gold";
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: gold, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.cartoes[0].nome).toBe("Nubank");
     d.cartoes[0].nome = "Cartão da mãe";
-    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    aplicarOpenFinance(
+      d,
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [{ conta: gold, transacoes: [] }],
+        },
+      ],
+      HOJE,
+    );
     expect(d.cartoes[0].nome).toBe("Cartão da mãe");
     // Dois cartões no mesmo banco: o nome comercial diferencia.
     const d2 = base();
     const outro = { ...cartao, id: "nu-ultra", marketingName: "ULTRAVIOLETA" };
     aplicarOpenFinance(
       d2,
-      [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }, { conta: outro, transacoes: [] }] }],
+      [
+        {
+          perfilId: "eu",
+          banco: "Nubank",
+          contas: [
+            { conta: gold, transacoes: [] },
+            { conta: outro, transacoes: [] },
+          ],
+        },
+      ],
       HOJE,
     );
-    expect(d2.cartoes.map((c) => c.nome)).toEqual(["Nubank Gold", "Nubank Ultravioleta"]);
+    expect(d2.cartoes.map((c) => c.nome)).toEqual([
+      "Nubank Gold",
+      "Nubank Ultravioleta",
+    ]);
   });
 
   it("RecargaPay é transferência, Mercado Livre não é supermercado, IOF é tarifa", () => {
-    expect(categoriaDaPluggy("Services", "Recargapay *Lucasmart", "saida")).toBe("transferencia");
-    expect(categoriaDaPluggy(null, "MERCADOLIVRE*LOJA", "saida")).toBe("compras");
-    expect(categoriaDaPluggy(null, "Confianca Max", "saida")).not.toBe("assinatura");
-    expect(categoriaDaPluggy(null, "Supermercado Tauste", "saida")).toBe("mercado");
-    expect(categoriaDaPluggy(null, "IOF de compra internacional", "saida")).toBe("tarifa");
-    expect(categoriaDaPluggy(null, "Dl *Sgl Telegram Premium", "saida")).toBe("assinatura");
+    expect(
+      categoriaDaPluggy("Services", "Recargapay *Lucasmart", "saida"),
+    ).toBe("transferencia");
+    expect(categoriaDaPluggy(null, "MERCADOLIVRE*LOJA", "saida")).toBe(
+      "compras",
+    );
+    expect(categoriaDaPluggy(null, "Confianca Max", "saida")).not.toBe(
+      "assinatura",
+    );
+    expect(categoriaDaPluggy(null, "Supermercado Tauste", "saida")).toBe(
+      "mercado",
+    );
+    expect(
+      categoriaDaPluggy(null, "IOF de compra internacional", "saida"),
+    ).toBe("tarifa");
+    expect(categoriaDaPluggy(null, "Dl *Sgl Telegram Premium", "saida")).toBe(
+      "assinatura",
+    );
   });
 
   it("arruma o nome do cartão que vem todo em maiúsculas ou minúsculas", () => {
@@ -621,7 +940,9 @@ describe("Open Finance", () => {
 
   it("traduz categorias e limpa a parcela da descrição", () => {
     expect(categoriaDaPluggy("Groceries", "ASSAI", "saida")).toBe("mercado");
-    expect(categoriaDaPluggy("Gas stations", "SHELL", "saida")).toBe("transporte");
+    expect(categoriaDaPluggy("Gas stations", "SHELL", "saida")).toBe(
+      "transporte",
+    );
     expect(categoriaDaPluggy("Electricity", "ENEL", "saida")).toBe("luz");
     expect(categoriaDaPluggy(null, "NETFLIX.COM", "saida")).toBe("assinatura");
     expect(categoriaDaPluggy("Salary", "SALARIO", "entrada")).toBe("renda");
@@ -633,11 +954,87 @@ describe("Open Finance", () => {
 
 describe("Pix para você mesmo pelo cartão", () => {
   it("RecargaPay com o começo do seu nome é para você mesmo", () => {
-    expect(paraVoceMesmo("Recargapay *Lucasmart", ["LUCAS M MARTINEZ", "Lucas"])).toBe(true);
+    expect(
+      paraVoceMesmo("Recargapay *Lucasmart", ["LUCAS M MARTINEZ", "Lucas"]),
+    ).toBe(true);
     expect(paraVoceMesmo("RECARGAPAY *LUCASMART", [null, "Lucas"])).toBe(true);
   });
   it("de outra pessoa, ou sem RecargaPay, não", () => {
-    expect(paraVoceMesmo("Recargapay *Marianaca", ["Lucas Martins Martinez", "Lucas"])).toBe(false);
+    expect(
+      paraVoceMesmo("Recargapay *Marianaca", [
+        "Lucas Martins Martinez",
+        "Lucas",
+      ]),
+    ).toBe(false);
     expect(paraVoceMesmo("Mercadolivre*Lucasmart", ["Lucas"])).toBe(false);
+  });
+});
+
+describe("fatura: moeda e saldo anterior", () => {
+  it("compra internacional usa o valor em reais", () => {
+    const t = {
+      id: "1",
+      date: "2026-11-01",
+      description: "Anthropic",
+      amount: 20.33,
+      amountInAccountCurrency: 114.4,
+      type: "DEBIT" as const,
+    };
+    expect(emReais(t).amount).toBe(114.4);
+    expect(emReais({ ...t, amountInAccountCurrency: null }).amount).toBe(20.33);
+    expect(
+      emReais({ ...t, amount: -20.33, type: "CREDIT" as const }).amount,
+    ).toBe(-114.4);
+  });
+
+  it("o que ficou sem pagar da fatura vencida vai para a seguinte", () => {
+    const pagamento = (valor: number) => ({
+      id: String(valor),
+      date: "2026-11-04",
+      description: "Pagamento recebido",
+      amount: -valor,
+      type: "CREDIT" as const,
+    });
+    const saldo = saldoNaoPago(
+      [
+        { dueDate: "2026-11-09", totalAmount: 3450.2604 },
+        { dueDate: "2026-10-07", totalAmount: 1082.1 },
+      ],
+      [pagamento(2645.56), pagamento(400)],
+      () => "2026-12",
+      "2026-11-12",
+    );
+    expect(saldo).toMatchObject({
+      mes: "2026-11",
+      proxima: "2026-12",
+      valor: 40_470,
+      rotulo: "nov/26",
+    });
+  });
+
+  it("fatura paga inteira, ou que ainda não venceu, não deixa saldo", () => {
+    const pago = {
+      id: "p",
+      date: "2026-11-04",
+      description: "Pagamento recebido",
+      amount: -3450.26,
+      type: "CREDIT" as const,
+    };
+    expect(
+      saldoNaoPago(
+        [{ dueDate: "2026-11-09", totalAmount: 3450.26 }],
+        [pago],
+        () => "2026-12",
+        "2026-11-12",
+      ),
+    ).toBeNull();
+    expect(
+      saldoNaoPago(
+        [{ dueDate: "2026-11-20", totalAmount: 3450.26 }],
+        [],
+        () => "2026-12",
+        "2026-11-12",
+      ),
+    ).toBeNull();
   });
 });
