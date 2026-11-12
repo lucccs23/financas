@@ -153,9 +153,14 @@ export default function PaginaAnalises() {
   }, [gastos, emAndamento, hoje, mes]);
   const diaMaisCaro = [...semana].sort((a, b) => b.media - a.media)[0];
 
+  // Parcelas de compras antigas e assinaturas já são do mês inteiro: só o
+  // resto segue o ritmo dos dias.
+  const fixos = gastos
+    .filter((g) => g.mes === mes && g.parcela)
+    .reduce((s, g) => s + g.valor, 0);
   const projecao =
     emAndamento && diasContados > 0
-      ? Math.round((n.total / diasContados) * diasNoMes(mes))
+      ? fixos + Math.round(((n.total - fixos) / diasContados) * diasNoMes(mes))
       : null;
   const semDados = gastos.length === 0;
   const maxLugar = lugares[0]?.total ?? 1;

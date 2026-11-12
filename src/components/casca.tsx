@@ -13,6 +13,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 import {
@@ -130,9 +131,20 @@ const ORDEM_PADRAO: OrdemMenu = {
 };
 const ITENS = new Map([...MENU, ...AJUSTES].map((i) => [i.href, i]));
 
+/**
+ * Arraste com o mouse, feito à mão (sem o arrastar nativo do navegador, que
+ * mostra um "fantasma" e uma linha): o item segue o ponteiro e os outros
+ * deslizam para abrir espaço.
+ */
 interface Arraste {
   href: string;
-  alvo: { grupo: GrupoMenu; indice: number } | null;
+  origem: { grupo: GrupoMenu; indice: number };
+  /** Onde o item vai ficar, contando a lista sem ele. */
+  alvo: { grupo: GrupoMenu; indice: number };
+  /** Quanto o item já andou desde o clique (px). */
+  dy: number;
+  /** Altura de um item mais o espaço entre eles. */
+  altura: number;
 }
 
 interface ContextoOrdem {
@@ -141,7 +153,15 @@ interface ContextoOrdem {
   organizando: boolean;
   setOrganizando: (v: boolean) => void;
   arraste: Arraste | null;
-  setArraste: (a: Arraste | null) => void;
+  /** Logo depois de soltar: sem animação, para nada "voltar deslizando". */
+  soltando: boolean;
+  comecarArraste: (e: ReactPointerEvent<HTMLLIElement>, grupo: GrupoMenu, indice: number) => void;
+}
+
+/** Move o item para a posição final `indice` (contada na lista sem ele). */
+function colocarEm(ordem: OrdemMenu, href: string, grupo: GrupoMenu, indice: number): OrdemMenu {
+  const de = ordem[grupo].indexOf(href);
+  return moverItem(ordem, href, grupo, de !== -1 && indice >= de ? indice + 1 : indice);
 }
 
 const OrdemContexto = createContext<ContextoOrdem | null>(null);
@@ -213,9 +233,81 @@ function Estrutura({ children }: { children: ReactNode }) {
   const { ordem, mudar } = useOrdemGuardada(perfil?.id);
   const [organizando, setOrganizando] = useState(false);
   const [arraste, setArraste] = useState<Arraste | null>(null);
+  const [soltando, setSoltando] = useState(false);
+  const ordemAtual = useRef(ordem);
+  const arrasteAtual = useRef<Arraste | null>(null);
+  useEffect(() => {
+    ordemAtual.current = ordem;
+  }, [ordem]);
+
+  const comecarArraste = useCallback(
+    (e: ReactPointerEvent<HTMLLIElement>, grupo: GrupoMenu, indice: number) => {
+      // Mouse e caneta; no toque, o celular usa "Organizar" (setas).
+      if (e.button !== 0 || e.pointerType === "touch") return;
+      const item = e.currentTarget;
+      const raiz = item.closest("[data-menu-raiz]");
+      if (!raiz) return;
+      const href = ordemAtual.current[grupo][indice];
+      const inicioY = e.clientY;
+      const caixa = item.getBoundingClientRect();
+      const altura = caixa.height + 4; // space-y-1
+      const centro = caixa.top + caixa.height / 2;
+      // As posições de todos os itens, como ficariam sem o arrastado.
+      const vagas = [...raiz.querySelectorAll<HTMLElement>("[data-menu-item]")]
+        .filter((el) => el !== item)
+        .map((el) => {
+          const g = el.dataset.grupo as GrupoMenu;
+          const i = Number(el.dataset.indice);
+          const r = el.getBoundingClientRect();
+          const depois = g === grupo && i > indice;
+          return { grupo: g, meio: r.top + r.height / 2 - (depois ? altura : 0) };
+        });
+      const topoAjustes = raiz
+        .querySelector("[data-menu-grupo=ajustes]")
+        ?.getBoundingClientRect().top;
+      let andou = false;
+
+      const mover = (ev: PointerEvent) => {
+        const dy = ev.clientY - inicioY;
+        if (!andou && Math.abs(dy) < 5) return;
+        andou = true;
+        const y = centro + dy;
+        const g: GrupoMenu =
+          topoAjustes !== undefined && y > topoAjustes - 12 ? "ajustes" : "menu";
+        const i = vagas.filter((v) => v.grupo === g && v.meio < y).length;
+        const novo = { href, origem: { grupo, indice }, alvo: { grupo: g, indice: i }, dy, altura };
+        arrasteAtual.current = novo;
+        setArraste(novo);
+      };
+      const soltar = () => {
+        window.removeEventListener("pointermove", mover);
+        window.removeEventListener("pointerup", soltar);
+        window.removeEventListener("pointercancel", soltar);
+        const a = arrasteAtual.current;
+        arrasteAtual.current = null;
+        if (!andou || !a) return;
+        // O clique que vem junto com o soltar não abre a página.
+        const engolir = (c: MouseEvent) => {
+          c.preventDefault();
+          c.stopPropagation();
+        };
+        window.addEventListener("click", engolir, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", engolir, { capture: true }), 0);
+        setSoltando(true);
+        mudar(colocarEm(ordemAtual.current, a.href, a.alvo.grupo, a.alvo.indice));
+        setArraste(null);
+        requestAnimationFrame(() => requestAnimationFrame(() => setSoltando(false)));
+      };
+      window.addEventListener("pointermove", mover);
+      window.addEventListener("pointerup", soltar);
+      window.addEventListener("pointercancel", soltar);
+    },
+    [mudar],
+  );
+
   const contexto = useMemo(
-    () => ({ ordem, mudar, organizando, setOrganizando, arraste, setArraste }),
-    [ordem, mudar, organizando, arraste],
+    () => ({ ordem, mudar, organizando, setOrganizando, arraste, soltando, comecarArraste }),
+    [ordem, mudar, organizando, arraste, soltando, comecarArraste],
   );
   const caminho = usePathname();
   // Guarda em qual tela a gaveta foi aberta: ao navegar, ela fecha sozinha.
@@ -269,25 +361,23 @@ function ativo(caminho: string, href: string): boolean {
  */
 function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
   const caminho = usePathname();
-  const { ordem, mudar, organizando, setOrganizando, arraste, setArraste } =
+  const { ordem, mudar, organizando, setOrganizando, arraste, soltando, comecarArraste } =
     useOrdem();
   const itens = ordem[grupo].map((href) => ITENS.get(href)!).filter(Boolean);
-  const alvo = arraste?.alvo?.grupo === grupo ? arraste.alvo.indice : null;
+  const alvo = arraste?.alvo.grupo === grupo ? arraste.alvo.indice : null;
   const primeiro = ordem.menu[0] ?? ordem.ajustes[0];
   const ultimo = ordem.ajustes.at(-1) ?? ordem.menu.at(-1);
 
-  const apontar = (indice: number) => {
-    if (!arraste) return;
-    if (arraste.alvo?.grupo !== grupo || arraste.alvo.indice !== indice) {
-      setArraste({ ...arraste, alvo: { grupo, indice } });
-    }
-  };
-  const soltar = () => {
-    if (arraste?.alvo)
-      mudar(
-        moverItem(ordem, arraste.href, arraste.alvo.grupo, arraste.alvo.indice),
-      );
-    setArraste(null);
+  /** Quanto cada item desliza enquanto outro é arrastado. */
+  const deslocamento = (i: number) => {
+    if (!arraste) return 0;
+    const { origem, altura } = arraste;
+    const daOrigem = origem.grupo === grupo;
+    const sobe = daOrigem && i > origem.indice ? -altura : 0;
+    // Posição na lista sem o arrastado.
+    const j = daOrigem && i > origem.indice ? i - 1 : i;
+    const desce = alvo !== null && j >= alvo ? altura : 0;
+    return sobe + desce;
   };
 
   return (
@@ -305,16 +395,13 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
         )}
       </div>
       <ul
-        className={cx("space-y-1", itens.length === 0 && "min-h-10")}
-        onDragOver={(e) => {
-          if (!arraste || e.target !== e.currentTarget) return;
-          e.preventDefault();
-          apontar(itens.length);
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          soltar();
-        }}
+        data-menu-grupo={grupo}
+        className={cx(
+          "space-y-1 transition-[padding] duration-200",
+          itens.length === 0 && "min-h-10",
+          // Grupo que recebe um item de fora cresce para caber.
+          arraste && alvo !== null && arraste.origem.grupo !== grupo && "pb-11",
+        )}
       >
         {itens.length === 0 && (
           <li
@@ -334,34 +421,26 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
           return (
             <li
               key={item.href}
-              draggable
-              onDragStart={(e) => {
-                e.dataTransfer.effectAllowed = "move";
-                e.dataTransfer.setData("text/plain", item.href);
-                setArraste({ href: item.href, alvo: null });
-              }}
-              onDragEnd={() => setArraste(null)}
-              onDragOver={(e) => {
-                if (!arraste) return;
-                e.preventDefault();
-                const caixa = e.currentTarget.getBoundingClientRect();
-                apontar(e.clientY > caixa.top + caixa.height / 2 ? i + 1 : i);
+              data-menu-item
+              data-grupo={grupo}
+              data-indice={i}
+              onPointerDown={organizando ? undefined : (e) => comecarArraste(e, grupo, i)}
+              style={{
+                transform: arrastando
+                  ? `translateY(${arraste.dy}px) scale(1.02)`
+                  : `translateY(${deslocamento(i)}px)`,
               }}
               className={cx(
-                "group relative flex items-center gap-1",
-                arrastando && "opacity-40",
+                "group relative flex items-center gap-1 rounded-lg select-none",
+                arrastando
+                  ? "z-10 cursor-grabbing bg-surface-2 shadow-pop"
+                  : !soltando && "transition-transform duration-200 ease-out",
               )}
             >
-              {/* Onde o item vai cair. */}
-              {alvo === i && (
-                <span className="pointer-events-none absolute inset-x-2 -top-[3px] h-0.5 rounded-full bg-primary" />
-              )}
-              {alvo === itens.length && i === itens.length - 1 && (
-                <span className="pointer-events-none absolute inset-x-2 -bottom-[3px] h-0.5 rounded-full bg-primary" />
-              )}
               <Link
                 href={item.href}
                 draggable={false}
+                onDragStart={(e) => e.preventDefault()}
                 aria-current={aqui ? "page" : undefined}
                 className={cx(
                   "flex h-10 min-w-0 flex-1 items-center gap-4 rounded-lg px-4 text-sm transition-colors",
@@ -468,7 +547,7 @@ function BarraLateral() {
   ];
 
   return (
-    <div className="flex h-full flex-col rounded-card border border-line bg-surface p-4 shadow-card">
+    <div data-menu-raiz className="flex h-full flex-col rounded-card border border-line bg-surface p-4 shadow-card">
       <Link
         href="/"
         className="mb-6 flex items-center gap-4 rounded-lg px-2 pt-2 pb-1"
