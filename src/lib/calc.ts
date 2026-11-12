@@ -116,6 +116,16 @@ export function mesPrimeiraFatura(
 
 /* ───────────────────────── Itens do mês ───────────────────────── */
 
+/**
+ * Nome do cartão com o banco quando o nome sozinho não diz qual é
+ * ("Gold" → "Nubank Gold"; "Mercado Pago" continua "Mercado Pago").
+ */
+export function nomeDoCartao(cartao: Pick<Cartao, "nome" | "banco">): string {
+  const banco = cartao.banco?.trim();
+  if (!banco || cartao.nome.toLowerCase().includes(banco.toLowerCase())) return cartao.nome;
+  return `${banco} ${cartao.nome}`;
+}
+
 export const chaveLancamento = (refTipo: Lancamento["refTipo"], refId: Id, mes: Mes) =>
   `${refTipo}:${refId}:${mes}`;
 
@@ -182,7 +192,7 @@ export function itensDoMes(dados: Dados, mes: Mes): ItemMes[] {
       chave: `fatura:${k.id}`,
       refTipo: "fatura",
       refId: k.id,
-      nome: `Fatura ${k.nome}`,
+      nome: `Fatura ${nomeDoCartao(k)}`,
       valor,
       valorCadastrado: valor,
       dia: Math.min(Math.max(1, k.diaVencimento), diasNoMes(mes)),

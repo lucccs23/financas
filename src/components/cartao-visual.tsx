@@ -104,7 +104,8 @@ export function CartaoVisual({
           <path d="M13 0v9H0M25 0v9h13M13 28v-9H0M25 28v-9h13M13 9v10M25 9v10" stroke="rgba(0,0,0,0.28)" strokeWidth="1.2" />
         </svg>
         <p className="min-w-0 flex-1 truncate text-center text-[12px]/4 font-medium tracking-[0.32em] text-white/85 uppercase">
-          {cartao.nome}
+          {/* Cartão chamado pelo banco: o nome já está em cima. */}
+          {cartao.nome.trim().toLowerCase() !== cartao.banco.trim().toLowerCase() && cartao.nome}
         </p>
         <Nfc aria-hidden size={20} className="shrink-0 text-white/70" />
       </div>

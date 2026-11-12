@@ -58,7 +58,15 @@ export interface TransacaoPluggy {
   type: "DEBIT" | "CREDIT";
   status?: "PENDING" | "POSTED";
   category?: string | null;
+  /** Estabelecimento: nome e o tipo de negócio. */
+  merchant?: {
+    name?: string | null;
+    businessName?: string | null;
+    category?: string | null;
+  } | null;
   creditCardMetadata?: {
+    /** Código do tipo de estabelecimento (MCC): 5411 mercado, 5541 posto... */
+    payeeMCC?: number | null;
     installmentNumber?: number | null;
     totalInstallments?: number | null;
     totalAmount?: number | null;
@@ -203,11 +211,53 @@ export function semParcela(descricao: string) {
     .trim();
 }
 
-/** Traduz a categoria da Pluggy para a do app; sem tradução, usa as pistas da descrição. */
+/** Código do tipo de estabelecimento (MCC, padrão das bandeiras) → categoria do app. */
+export function categoriaDoMcc(mcc: number | null | undefined): string | null {
+  if (!mcc) return null;
+  const faixas: [number, number, string][] = [
+    [3000, 3350, "lazer"], // companhias aéreas
+    [3351, 3500, "transporte"], // locadoras de carro
+    [3501, 3999, "lazer"], // hotéis
+    [4011, 4131, "transporte"], // trem, ônibus, metrô, táxi
+    [4511, 4582, "lazer"], // aéreo e aeroportos
+    [4722, 4722, "lazer"], // agências de viagem
+    [4784, 4789, "transporte"], // pedágio
+    [4812, 4816, "internet"], // telefone e internet
+    [4899, 4899, "assinatura"], // TV por assinatura e streaming
+    [4900, 4900, "outros"], // contas de consumo (luz, água, gás juntas)
+    [5200, 5399, "compras"], // casa, construção, lojas de departamento
+    [5411, 5411, "mercado"],
+    [5422, 5499, "mercado"], // açougue, padaria, hortifrúti
+    [5511, 5599, "transporte"], // carro, peças, posto (5541/5542)
+    [5600, 5699, "compras"], // roupas e calçados
+    [5700, 5799, "compras"], // móveis e eletrônicos
+    [5811, 5814, "alimentacao"], // restaurantes, bares, fast food
+    [5815, 5815, "assinatura"], // mídia digital
+    [5816, 5816, "lazer"], // jogos digitais
+    [5817, 5818, "assinatura"], // apps e serviços digitais
+    [5912, 5912, "saude"], // farmácia
+    [5940, 5941, "compras"], // esporte
+    [5942, 5943, "educacao"], // livraria e papelaria
+    [5944, 5999, "compras"],
+    [7011, 7033, "lazer"], // hospedagem
+    [7512, 7549, "transporte"], // aluguel de carro, estacionamento, oficina
+    [7829, 7841, "lazer"], // cinema e vídeo
+    [7911, 7999, "lazer"], // diversão, shows, academias e clubes
+    [8011, 8099, "saude"], // médicos, dentistas, hospitais
+    [8211, 8299, "educacao"], // escolas, cursos, faculdades
+  ];
+  return faixas.find(([de, ate]) => mcc >= de && mcc <= ate)?.[2] ?? null;
+}
+
+/**
+ * Traduz a categoria da Pluggy para a do app. Sem tradução, tenta o tipo do
+ * estabelecimento (MCC), a categoria do comerciante e as pistas da descrição.
+ */
 export function categoriaDaPluggy(
   categoria: string | null | undefined,
   descricao: string,
   tipo: "entrada" | "saida",
+  extra: { mcc?: number | null; comerciante?: string | null; ramo?: string | null } = {},
 ): string {
   const c = normalizar(categoria ?? "");
   if (tipo === "entrada") {
@@ -244,9 +294,33 @@ export function categoriaDaPluggy(
     ],
     [/donation/, "familia"],
   ];
-  const achada = regras.find(([r]) => r.test(c))?.[1];
-  if (achada) return achada;
-  return sugerirCategoria(descricao);
+  const pelaRegra = (texto: string) => regras.find(([r]) => r.test(texto))?.[1];
+  const achada = pelaRegra(c);
+  // "Transferência" e "Compras" são vagas: o estabelecimento costuma dizer mais.
+  if (achada && achada !== "compras" && achada !== "transferencia") return achada;
+  const doMcc = categoriaDoMcc(extra.mcc);
+  if (doMcc && doMcc !== "outros") return doMcc;
+  const doRamo = extra.ramo ? pelaRegra(normalizar(extra.ramo)) : undefined;
+  if (doRamo && doRamo !== "transferencia") return doRamo;
+  const pelaDescricao = sugerirCategoria(`${descricao} ${extra.comerciante ?? ""}`);
+  if (pelaDescricao !== "outros") return pelaDescricao;
+  return achada ?? "outros";
+}
+
+/** O que a Pluggy sabe do estabelecimento, para escolher a categoria. */
+const doEstabelecimento = (t: TransacaoPluggy) => ({
+  mcc: t.creditCardMetadata?.payeeMCC,
+  comerciante: t.merchant?.name ?? t.merchant?.businessName,
+  ramo: t.merchant?.category,
+});
+
+/** "GOLD" e "gold" viram "Gold"; nomes já escritos com maiúsculas ficam. */
+export function nomeBonito(nome: string) {
+  const t = nome.trim();
+  if (t !== t.toUpperCase() && t !== t.toLowerCase()) return t;
+  return t
+    .toLowerCase()
+    .replace(/(^|[\s-])(\p{L})/gu, (_, a: string, b: string) => a + b.toUpperCase());
 }
 
 /** Dinheiro que só muda de lugar: não é gasto nem renda nova. */
@@ -350,7 +424,19 @@ function aplicarConta(
   const perfil = banco.perfis.find((p) => p.id === perfilId)!;
 
   for (const t of [...transacoes].sort((a, b) => a.date.localeCompare(b.date))) {
-    if (jaVieram.has(t.id)) continue;
+    if (jaVieram.has(t.id)) {
+      // Ficou em "Outros" numa busca anterior: tenta de novo. A sua escolha fica.
+      const antiga = banco.transacoes.find((x) => x.externoId === t.id);
+      if (antiga && antiga.categoria === "outros" && antiga.tipo === "saida") {
+        antiga.categoria = categoriaDaPluggy(
+          t.category,
+          t.description,
+          "saida",
+          doEstabelecimento(t),
+        );
+      }
+      continue;
+    }
     const tipo: Transacao["tipo"] = t.type === "CREDIT" ? "entrada" : "saida";
     const valor = centavos(t.amount);
     const quando = data(t.date);
@@ -401,7 +487,7 @@ function aplicarConta(
       descricao: t.description.trim(),
       valor,
       tipo,
-      categoria: categoriaDaPluggy(t.category, t.description, tipo),
+      categoria: categoriaDaPluggy(t.category, t.description, tipo, doEstabelecimento(t)),
       carteiraId: carteira.id,
       carteiraDestinoId: null,
       observacao,
@@ -510,6 +596,16 @@ function aplicarCartao(
   const { perfilId } = conexao;
   const credito = conta.creditData ?? {};
   let cartao = banco.cartoes.find((c) => c.externoId === conta.id);
+  // O cartão se chama pelo banco ("Nubank", "Inter"). O nome comercial
+  // ("Gold", "Platinum") só entra quando o mesmo banco tem mais de um cartão.
+  const nomeComercial = conta.marketingName?.trim() || conta.name?.trim() || "";
+  const variosNoBanco = conexao.contas.filter((c) => c.conta.type === "CREDIT").length > 1;
+  const nomePadrao =
+    conexao.banco === "Banco"
+      ? nomeBonito(nomeComercial || "Cartão")
+      : variosNoBanco && nomeComercial
+        ? `${conexao.banco} ${nomeBonito(nomeComercial)}`
+        : conexao.banco;
 
   // Pendente no cartão é compra da fatura aberta (ou parcela futura): entra.
   // Autorização pendente antiga e esquecida, não.
@@ -528,7 +624,7 @@ function aplicarCartao(
       id: novoId(),
       perfilId,
       larId: null,
-      nome: conta.marketingName?.trim() || conta.name?.trim() || conexao.banco,
+      nome: nomePadrao,
       banco: conexao.banco,
       cor: banco.cartoes.filter((c) => c.perfilId === perfilId).length % 7,
       limite: centavos(credito.creditLimit),
@@ -544,6 +640,14 @@ function aplicarCartao(
   } else {
     if (conexao.banco !== "Banco" && (!cartao.banco || nomeAutomatico(cartao.banco, conta))) {
       cartao.banco = conexao.banco;
+    }
+    // Nome que o app deu numa busca anterior ("GOLD", "gold"...): passa a ser
+    // o do banco. Um nome que você mesmo escolheu fica.
+    if (
+      [nomeComercial, nomeBonito(nomeComercial), "Banco", "Cartão"].includes(cartao.nome) ||
+      nomeAutomatico(cartao.nome, conta)
+    ) {
+      cartao.nome = nomePadrao;
     }
     if (credito.creditLimit != null) cartao.limite = centavos(credito.creditLimit);
     // Cartão criado com o chute antigo de fechamento: corrige uma vez, se as
@@ -657,6 +761,16 @@ function aplicarCartao(
       existente.externoId = chave;
       existente.mesPrimeira = mesPrimeira; // o banco manda na fatura e no valor
       existente.valor = valor;
+      // Ficou em "Outros" numa busca anterior: tenta de novo com o que o banco
+      // sabe do estabelecimento. Uma categoria que você escolheu fica.
+      if ((existente.categoria ?? "outros") === "outros") {
+        existente.categoria = categoriaDaPluggy(
+          t.category,
+          t.description,
+          "saida",
+          doEstabelecimento(t),
+        );
+      }
       continue;
     }
 
@@ -686,7 +800,7 @@ function aplicarCartao(
       mesPrimeira,
       mesFim: null,
       data: compradoEm,
-      categoria: categoriaDaPluggy(t.category, t.description, "saida"),
+      categoria: categoriaDaPluggy(t.category, t.description, "saida", doEstabelecimento(t)),
       externoId: chave,
     } satisfies Compra);
     resumo.compras++;

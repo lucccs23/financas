@@ -4,6 +4,8 @@ import { saldoCarteira } from "./calc-extra";
 import {
   aplicarOpenFinance,
   categoriaDaPluggy,
+  categoriaDoMcc,
+  nomeBonito,
   nomeDoBanco,
   semParcela,
   type ConexaoBuscada,
@@ -511,6 +513,50 @@ describe("Open Finance", () => {
       );
       expect(d.compras).toHaveLength(0);
     });
+  });
+
+  it("usa o tipo do estabelecimento (MCC) quando a categoria da Pluggy não diz", () => {
+    expect(categoriaDoMcc(5411)).toBe("mercado");
+    expect(categoriaDoMcc(5542)).toBe("transporte");
+    expect(categoriaDoMcc(5912)).toBe("saude");
+    expect(categoriaDoMcc(5814)).toBe("alimentacao");
+    expect(categoriaDoMcc(9999)).toBeNull();
+    expect(categoriaDaPluggy(null, "PG *XPTO", "saida", { mcc: 5812 })).toBe("alimentacao");
+    // "Shopping" é vago: o MCC de posto vence.
+    expect(categoriaDaPluggy("Shopping", "AUTO POSTO", "saida", { mcc: 5541 })).toBe("transporte");
+    // Categoria específica da Pluggy continua valendo.
+    expect(categoriaDaPluggy("Groceries", "X", "saida", { mcc: 5812 })).toBe("mercado");
+    expect(categoriaDaPluggy(null, "LOJA 123", "saida", { ramo: "Pharmacy" })).toBe("saude");
+  });
+
+  it("cartão se chama pelo banco; o nome comercial só com mais de um cartão no banco", () => {
+    const d = base();
+    const gold = { ...cartao, id: "nu-gold", marketingName: "gold" };
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    expect(d.cartoes[0].nome).toBe("Nubank");
+    // Nome automático de uma versão anterior ("gold") vira o do banco; o seu fica.
+    d.cartoes[0].nome = "gold";
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    expect(d.cartoes[0].nome).toBe("Nubank");
+    d.cartoes[0].nome = "Cartão da mãe";
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }] }], HOJE);
+    expect(d.cartoes[0].nome).toBe("Cartão da mãe");
+    // Dois cartões no mesmo banco: o nome comercial diferencia.
+    const d2 = base();
+    const outro = { ...cartao, id: "nu-ultra", marketingName: "ULTRAVIOLETA" };
+    aplicarOpenFinance(
+      d2,
+      [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: gold, transacoes: [] }, { conta: outro, transacoes: [] }] }],
+      HOJE,
+    );
+    expect(d2.cartoes.map((c) => c.nome)).toEqual(["Nubank Gold", "Nubank Ultravioleta"]);
+  });
+
+  it("arruma o nome do cartão que vem todo em maiúsculas ou minúsculas", () => {
+    expect(nomeBonito("GOLD")).toBe("Gold");
+    expect(nomeBonito("gold")).toBe("Gold");
+    expect(nomeBonito("MERCADO PAGO")).toBe("Mercado Pago");
+    expect(nomeBonito("Ultravioleta")).toBe("Ultravioleta");
   });
 
   it("traduz categorias e limpa a parcela da descrição", () => {

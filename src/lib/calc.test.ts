@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  nomeDoCartao,
   alertas,
   gastosPorCategoria,
   registrarRenda,
@@ -88,6 +89,15 @@ function cenarioReferencia(): Dados {
   ];
   return d;
 }
+
+describe("nome do cartão", () => {
+  it("põe o banco quando o nome sozinho não diz qual é", () => {
+    expect(nomeDoCartao({ nome: "Gold", banco: "Nubank" })).toBe("Nubank Gold");
+    expect(nomeDoCartao({ nome: "Mercado Pago", banco: "Mercado Pago" })).toBe("Mercado Pago");
+    expect(nomeDoCartao({ nome: "Nubank Ultravioleta", banco: "Nubank" })).toBe("Nubank Ultravioleta");
+    expect(nomeDoCartao({ nome: "Principal", banco: "" })).toBe("Principal");
+  });
+});
 
 describe("meses", () => {
   it("soma e subtrai atravessando o ano", () => {
@@ -288,7 +298,7 @@ describe("cartões", () => {
     };
     d.cartoes = [cartao];
     d.compras = [compra({ id: "tv", valor: 300_000, parcelas: 3 })];
-    expect(itensDoMes(d, MES).map((i) => [i.nome, i.valor])).toEqual([["Fatura Principal", 100_000]]);
+    expect(itensDoMes(d, MES).map((i) => [i.nome, i.valor])).toEqual([["Fatura Banco Principal", 100_000]]);
     expect(limiteUsado(cartao, d, MES)).toBe(300_000);
     d.lancamentos = [
       { id: "l1", perfilId: "eu", larId: null, refTipo: "fatura", refId: "k1", mes: MES, valor: null, pago: true, pulado: false },

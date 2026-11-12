@@ -148,7 +148,15 @@ export default function PaginaCartoes() {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <TituloPainel detalhe={cartao.banco || undefined}>{cartao.nome}</TituloPainel>
+                <TituloPainel
+                  detalhe={
+                    cartao.banco && !cartao.nome.toLowerCase().includes(cartao.banco.toLowerCase())
+                      ? cartao.banco
+                      : undefined
+                  }
+                >
+                  {cartao.nome}
+                </TituloPainel>
                 {cartao.larId && <Etiqueta tom="primario">cartão da casa</Etiqueta>}
                 {!meu && <Etiqueta>de {dono?.nome ?? "outro morador"}</Etiqueta>}
               </div>
