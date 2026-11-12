@@ -3,8 +3,9 @@
 // Regras:
 // - Cada conta do banco vira uma carteira; cada cartão vira um cartão. O saldo
 //   da carteira e o limite livre do cartão passam a bater com o banco.
-// - Extrato da conta vira Transações; compras do cartão viram Compras (uma por
-//   compra, mesmo parcelada).
+// - Extrato da conta vira Transações. No cartão, cada lançamento do banco
+//   (inclusive cada parcela) vira um lançamento na fatura que o banco indica,
+//   para a fatura do app somar o mesmo que a do banco.
 // - Nada entra duas vezes: o que já veio antes é reconhecido pelo id do banco,
 //   e o que você já tinha lançado à mão é ligado ao item do banco em vez de
 //   repetido.
@@ -22,6 +23,7 @@ import {
   mesPrimeiraFatura,
   ocorreNoMes,
   rendaNoMes,
+  valorParcela,
 } from "./calc";
 import { saldoCarteira } from "./calc-extra";
 import { sugerirCategoria } from "./categorias";
@@ -190,12 +192,7 @@ function diasEntre(a: string, b: string) {
 }
 
 function normalizar(texto: string) {
-  return texto
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  return texto.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 }
 
 /** Tira o "03/10" ou "PARC 03/10" do fim da descrição de uma parcela. */
@@ -222,7 +219,10 @@ export function categoriaDaPluggy(
     [/credit card payment/, "cartao"],
     [/same person|transfer|boleto|bank slip|\bpix\b|\bted\b|\bdoc\b/, "transferencia"],
     [/investment|fixed income|mutual fund|variable income|pension|margin/, "reserva"],
-    [/gas station|parking|toll|vehicle|automotive|taxi|ride|public transport|car rental|bicycle|transportation/, "transporte"],
+    [
+      /gas station|parking|toll|vehicle|automotive|taxi|ride|public transport|car rental|bicycle|transportation/,
+      "transporte",
+    ],
     [/groceries|supermarket/, "mercado"],
     [/eating out|food delivery|food and drinks|restaurant/, "alimentacao"],
     [/streaming|digital services/, "assinatura"],
@@ -234,8 +234,14 @@ export function categoriaDaPluggy(
     [/electricity/, "luz"],
     [/water/, "agua"],
     [/^gas$|utilities.*gas/, "gas"],
-    [/shopping|electronics|clothing|pet|kids|toys|sports goods|office|houseware|online shopping/, "compras"],
-    [/leisure|ticket|cinema|theater|concert|museum|stadium|travel|airline|accommodation|bus ticket|gaming|gambling|lottery|bet/, "lazer"],
+    [
+      /shopping|electronics|clothing|pet|kids|toys|sports goods|office|houseware|online shopping/,
+      "compras",
+    ],
+    [
+      /leisure|ticket|cinema|theater|concert|museum|stadium|travel|airline|accommodation|bus ticket|gaming|gambling|lottery|bet/,
+      "lazer",
+    ],
     [/donation/, "familia"],
   ];
   const achada = regras.find(([r]) => r.test(c))?.[1];
@@ -468,7 +474,8 @@ export function fechamentoPelasCompras(
   hoje: string,
 ): { dia: number; certo: boolean } | null {
   const debitos = transacoes.filter(
-    (t) => t.type === "DEBIT" && ehMes(t.creditCardMetadata?.billForecastDate) && data(t.date) <= hoje,
+    (t) =>
+      t.type === "DEBIT" && ehMes(t.creditCardMetadata?.billForecastDate) && data(t.date) <= hoje,
   );
   const aVista = debitos.filter((t) => (t.creditCardMetadata?.installmentNumber ?? 1) <= 1);
   if (!aVista.length) return null;
@@ -572,7 +579,7 @@ function aplicarCartao(
   for (const t of transacoes) {
     if (ehCompra(t) || t.status === "PENDING") continue;
     const paga = addMes(mesDaFatura(t), -1);
-    if (paga < mesHoje || paga === mesHoje) {
+    if (paga <= mesHoje) {
       const ja = banco.lancamentos.find(
         (l) => l.refTipo === "fatura" && l.refId === doCartao.id && l.mes === paga && l.pago,
       );
@@ -586,17 +593,49 @@ function aplicarCartao(
   // Modelo antigo (uma compra parcelada inteira, com as parcelas calculadas
   // aqui): sai, e cada parcela volta como o banco lança.
   banco.compras = banco.compras.filter(
-    (c) => !(c.cartaoId === doCartao.id && c.externoId && c.parcelas > 1),
+    (c) =>
+      !(
+        c.cartaoId === doCartao.id &&
+        c.externoId &&
+        c.parcelas > 1 &&
+        !c.externoId.endsWith("|manual")
+      ),
   );
+  // Parcelada lançada à mão: fica como você lançou (ligada ao banco) e as
+  // parcelas do banco para essa compra não entram de novo.
+  const parceladaManual = (
+    parcelas: number,
+    base: string,
+    compradoEm: string,
+    valor: number,
+    mes: Mes,
+  ) => {
+    const chave = `${conta.id}|${compradoEm}|${parcelas}|${normalizar(base)}|manual`;
+    const ligada = banco.compras.find((c) => c.cartaoId === doCartao.id && c.externoId === chave);
+    if (ligada) return chave;
+    const livre = banco.compras.find(
+      (c) =>
+        !c.externoId &&
+        !c.recorrente &&
+        c.cartaoId === doCartao.id &&
+        c.parcelas === parcelas &&
+        diasEntre(c.data, compradoEm) <= 3 &&
+        Math.abs(valorParcela(c, mes) - valor) <= parcelas,
+    );
+    if (!livre) return null;
+    livre.externoId = chave;
+    resumo.ligadas++;
+    return chave;
+  };
 
   // Cada lançamento do banco vira um lançamento na fatura que o banco indica:
   // assim a fatura do app soma o mesmo que a do banco. A chave não muda quando
   // o lançamento sai de "pendente" (o id do banco pode mudar); lançamentos
   // iguais ganham #2, #3...
   const vistas = new Map<string, number>();
-  const ordenadas = [...transacoes].filter(ehCompra).sort(
-    (a, b) => data(a.date).localeCompare(data(b.date)) || a.id.localeCompare(b.id),
-  );
+  const ordenadas = [...transacoes]
+    .filter(ehCompra)
+    .sort((a, b) => data(a.date).localeCompare(data(b.date)) || a.id.localeCompare(b.id));
   const chaves = new Set<string>();
 
   for (const t of ordenadas) {
@@ -618,6 +657,13 @@ function aplicarCartao(
     chaves.add(chave);
 
     const mesPrimeira = mesDaFatura(t);
+    if (parcelas > 1) {
+      const manual = parceladaManual(parcelas, base, compradoEm, valor, mesPrimeira);
+      if (manual) {
+        chaves.add(manual);
+        continue;
+      }
+    }
     // Já veio antes (pela chave nova ou pelo id do banco, das primeiras buscas)?
     const existente = banco.compras.find(
       (c) => c.cartaoId === doCartao.id && (c.externoId === chave || c.externoId === t.id),
@@ -725,11 +771,14 @@ export function conferirCartoes(banco: Dados, conexoes: ConexaoBuscada[], hoje: 
         const m = addMes(mesHoje, i);
         const b = (doBanco.get(m) ?? 0) / 100;
         const a = faturaDoMes(cartao.id, banco.compras, m) / 100;
-        linhas.push(`  ${m}: banco ${b.toFixed(2)} · app ${a.toFixed(2)}${Math.abs(a - b) > 0.05 ? "  <- diferente" : ""}`);
+        linhas.push(
+          `  ${m}: banco ${b.toFixed(2)} · app ${a.toFixed(2)}${Math.abs(a - b) > 0.05 ? "  <- diferente" : ""}`,
+        );
       }
       // Item a item, na fatura do mês que vem: o que só um dos lados tem.
       const alvo = addMes(mesHoje, 1);
-      const chave = (desc: string, v: number) => `${normalizar(semParcela(desc)).slice(0, 12)}|${v}`;
+      const chave = (desc: string, v: number) =>
+        `${normalizar(semParcela(desc)).slice(0, 12)}|${v}`;
       const sobra = new Map<string, number>();
       for (const t of validas) {
         const r = t.creditCardMetadata?.billForecastDate;

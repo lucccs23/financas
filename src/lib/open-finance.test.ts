@@ -426,6 +426,47 @@ describe("Open Finance", () => {
       expect(d.compras.map((c) => c.valor)).toEqual([57_160]);
     });
 
+    it("parcelada lançada à mão não aparece em dobro quando as parcelas do banco chegam", () => {
+      const d = base();
+      const conta = cartaoSemFechamento("2026-11-09");
+      aplicarOpenFinance(d, conexao([{ conta, transacoes: [] }]), HOJE2);
+      const k = d.cartoes[0];
+      d.compras.push({
+        id: "minha",
+        cartaoId: k.id,
+        perfilId: "eu",
+        larId: null,
+        descricao: "Geladeira",
+        valor: 300_000,
+        parcelas: 10,
+        recorrente: false,
+        mesPrimeira: "2026-11",
+        mesFim: null,
+        data: "2026-10-20",
+        categoria: "compras",
+      });
+      const parcela = (n: number, rot: string) =>
+        compra(`g${n}`, `${rot}-01`, 300, rot, {
+          description: `MAGAZINE ${n}/10`,
+          creditCardMetadata: {
+            installmentNumber: n,
+            totalInstallments: 10,
+            purchaseDate: "2026-10-21",
+            billForecastDate: rot,
+          },
+        });
+      for (let i = 0; i < 2; i++) {
+        aplicarOpenFinance(
+          d,
+          conexao([{ conta, transacoes: [parcela(1, "2026-11"), parcela(2, "2026-12")] }]),
+          HOJE2,
+        );
+      }
+      expect(d.compras).toHaveLength(1);
+      expect(d.compras[0].externoId).toMatch(/\|manual$/);
+      expect(faturaDoMes(k.id, d.compras, "2026-12")).toBe(30_000);
+    });
+
     it("autorização pendente antiga e esquecida não entra", () => {
       const d = base();
       aplicarOpenFinance(

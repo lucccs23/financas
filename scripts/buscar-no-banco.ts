@@ -59,8 +59,7 @@ export function lerConfiguracao(
     .filter((c) => /^[0-9a-f-]{20,}$/i.test(c.item));
 }
 
-const semAcento = (t: string) =>
-  t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+const semAcento = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
 
 function situacaoDoItem(status: string | undefined): ConexaoNoCache["situacao"] {
   if (status === "UPDATED") return "ok";
@@ -83,7 +82,8 @@ async function pluggy<T>(chave: string, caminho: string): Promise<T> {
 async function buscar(cache: string) {
   const clientId = process.env.PLUGGY_CLIENT_ID;
   const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
-  if (!clientId || !clientSecret) throw new Error("Faltam PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET.");
+  if (!clientId || !clientSecret)
+    throw new Error("Faltam PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET.");
   const config = lerConfiguracao(process.env.PLUGGY_CONEXOES ?? "");
   if (!config.length) throw new Error("PLUGGY_CONEXOES está vazia: informe os ids das conexões.");
 
@@ -201,7 +201,11 @@ function diagnostico(conexao: ConexaoNoCache) {
     }
     // Amostra das movimentações recentes, campo a campo.
     const recentes = transacoes
-      .filter((t) => String(t.date).slice(0, 10) >= "2026-10-25")
+      .filter(
+        (t) =>
+          String(t.date).slice(0, 10) >=
+          new Date(Date.now() - 18 * 86_400_000).toISOString().slice(0, 10),
+      )
       .sort((a, b) => String(a.date).localeCompare(String(b.date)))
       .slice(0, 40);
     for (const t of recentes) {
@@ -248,7 +252,8 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
 
   const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10); // horário de Brasília
   const importado = aplicarOpenFinance(banco, prontas, hoje);
-  if (process.env.DIAGNOSTICO) for (const l of conferirCartoes(banco, prontas, hoje)) console.log(l);
+  if (process.env.DIAGNOSTICO)
+    for (const l of conferirCartoes(banco, prontas, hoje)) console.log(l);
   writeFileSync(arquivo, JSON.stringify(banco, null, 1));
 
   const status: StatusOpenFinance = {

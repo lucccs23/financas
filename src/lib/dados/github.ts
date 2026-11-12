@@ -256,6 +256,9 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
 
   async function gravarLote(lote: Pedido[]) {
     for (let tentativa = 0; tentativa < 4; tentativa++) {
+      // Depois de um conflito, espera um pouco: a outra gravação pode ainda
+      // estar terminando (outro aparelho ou a busca no banco).
+      if (tentativa > 0) await new Promise((r) => setTimeout(r, 400 * tentativa));
       let atual: Lido;
       try {
         atual = await obter(tentativa > 0);

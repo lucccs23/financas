@@ -15,7 +15,7 @@ import {
 import { CATEGORIAS, categoria, sugerirCategoria } from "@/lib/categorias";
 import { novoId } from "@/lib/dados/backend";
 import { formatar } from "@/lib/dinheiro";
-import { addMes, anoDe, nomeMes, NOMES_MESES, numeroDe } from "@/lib/meses";
+import { addMes, anoDe, dataBR, nomeMes, NOMES_MESES, numeroDe } from "@/lib/meses";
 import type { Cartao, Compra, Conta, Id, Mes, Natureza } from "@/lib/types";
 import { CORES_CARTAO } from "@/lib/visual-cartao";
 import { CartaoVisual } from "./cartao-visual";
@@ -106,7 +106,13 @@ export function FormConta({
     conta?.natureza ?? naturezaInicial ?? "despesa",
   );
   const [escopo, setEscopo] = useState<"pessoal" | "casa">(
-    conta ? (conta.larId ? "casa" : "pessoal") : escopoInicial === "casa" && lar ? "casa" : "pessoal",
+    conta
+      ? conta.larId
+        ? "casa"
+        : "pessoal"
+      : escopoInicial === "casa" && lar
+        ? "casa"
+        : "pessoal",
   );
   const [nome, setNome] = useState(conta?.nome ?? "");
   const [valor, setValor] = useState(conta?.valor ?? 0);
@@ -162,9 +168,7 @@ export function FormConta({
     let participantes: Record<Id, number> | null = null;
     if (daCasa && propria) {
       participantes = Object.fromEntries(
-        dados.moradores
-          .map((m): [Id, number] => [m.id, pesos[m.id] ?? 0])
-          .filter(([, p]) => p > 0),
+        dados.moradores.map((m): [Id, number] => [m.id, pesos[m.id] ?? 0]).filter(([, p]) => p > 0),
       );
       if (!Object.keys(participantes).length) {
         return avisar("Escolha ao menos uma pessoa na divisão.", "erro");
@@ -236,7 +240,7 @@ export function FormConta({
       tipo: "confirmar",
       titulo: `Excluir "${conta?.nome}"?`,
       texto: conta?.recorrente
-        ? "A conta some de todos os meses, inclusive dos passados, e não dá para desfazer. Se a conta só acabou, prefira ligar \"Tem data para acabar\": o histórico fica guardado."
+        ? 'A conta some de todos os meses, inclusive dos passados, e não dá para desfazer. Se a conta só acabou, prefira ligar "Tem data para acabar": o histórico fica guardado.'
         : "A conta some deste mês e não dá para desfazer.",
       rotulo: "Excluir conta",
       acao: async () => {
@@ -354,7 +358,7 @@ export function FormConta({
           dica={
             metaId
               ? "O valor entra na meta quando você marca a conta como paga. Desmarcar tira de volta."
-              : "Use para contas como \"Guardar na reserva\": o pagamento vira um valor guardado."
+              : 'Use para contas como "Guardar na reserva": o pagamento vira um valor guardado.'
           }
         >
           <Selecao value={metaId} onChange={(e) => setMetaId(e.target.value)}>
@@ -564,7 +568,8 @@ export function FormOcorrencia({
           <p className="text-xs text-ink-3">Valor da fatura</p>
           <p className="tabular mt-1 text-lg font-semibold text-ink">{formatar(item.valor)}</p>
           <p className="mt-1 text-xs text-ink-3">
-            O valor vem das compras lançadas no cartão. Para mudar, edite as compras na tela Cartões.
+            O valor vem das compras lançadas no cartão. Para mudar, edite as compras na tela
+            Cartões.
           </p>
         </div>
       )}
@@ -621,7 +626,8 @@ export function FormCartao({
 
   const salvar = async () => {
     if (!nome.trim()) return avisar("Dê um nome para o cartão.", "erro");
-    if (visual === "foto" && !imagem) return avisar("Escolha a foto do cartão ou volte para Cor.", "erro");
+    if (visual === "foto" && !imagem)
+      return avisar("Escolha a foto do cartão ou volte para Cor.", "erro");
     const larId = daCasa && lar ? lar.id : null;
     const linha: Cartao = {
       id: cartao?.id ?? novoId(),
@@ -633,10 +639,18 @@ export function FormCartao({
       limite,
       ...(mexeuDisponivel && limite > 0
         ? {
-            limiteAjuste: ajusteParaDisponivel({ id: cartao?.id ?? "", limite }, dados, mesHoje, disponivel),
+            limiteAjuste: ajusteParaDisponivel(
+              { id: cartao?.id ?? "", limite },
+              dados,
+              mesHoje,
+              disponivel,
+            ),
             limiteConferidoEm: hoje,
           }
-        : { limiteAjuste: cartao?.limiteAjuste ?? 0, limiteConferidoEm: cartao?.limiteConferidoEm ?? null }),
+        : {
+            limiteAjuste: cartao?.limiteAjuste ?? 0,
+            limiteConferidoEm: cartao?.limiteConferidoEm ?? null,
+          }),
       diaFechamento: fechamento,
       diaVencimento: vencimento,
       imagem: visual === "foto" ? imagem : null,
@@ -820,7 +834,10 @@ export function FormCartao({
       </p>
 
       <div className="grid grid-cols-2 gap-4">
-        <Campo rotulo="Dia do fechamento" dica="Compras depois deste dia vão para a fatura seguinte.">
+        <Campo
+          rotulo="Dia do fechamento"
+          dica="Compras depois deste dia vão para a fatura seguinte."
+        >
           <EntradaNumero valor={fechamento} onMudar={setFechamento} min={1} max={31} />
         </Campo>
         <Campo rotulo="Dia do vencimento">
@@ -869,6 +886,7 @@ export function FormCompra({
   const [mesManual, setMesManual] = useState<Mes | null>(compra?.mesPrimeira ?? null);
 
   const cartao = meus.find((c) => c.id === cartaoId);
+  const doBanco = !!compra?.externoId;
   const mesSugerido = cartao && data ? mesPrimeiraFatura(cartao, data) : mes;
   const mesPrimeira = mesManual ?? mesSugerido;
   const cadaParcela =
@@ -892,8 +910,16 @@ export function FormCompra({
       : 0;
 
   const salvar = async () => {
-    if (!cartao) return avisar("Escolha um cartão.", "erro");
     if (!descricao.trim()) return avisar("Descreva a compra.", "erro");
+    // Do banco: valor, fatura e cartão seguem o banco (estorno tem valor
+    // negativo); descrição e categoria são suas.
+    if (doBanco && compra) {
+      onFechar();
+      await atualizar("compras", compra.id, { descricao: descricao.trim(), categoria: cat });
+      avisar("Compra atualizada.");
+      return;
+    }
+    if (!cartao) return avisar("Escolha um cartão.", "erro");
     if (valor <= 0) return avisar("Informe um valor maior que zero.", "erro");
     const linha: Compra = {
       id: compra?.id ?? novoId(),
@@ -950,27 +976,45 @@ export function FormCompra({
         <p className="flex items-start gap-2 rounded-lg bg-primary-soft p-4 text-xs leading-5 text-primary-text">
           <Landmark size={16} className="mt-0.5 shrink-0" />
           <span>
-            Veio da fatura pelo Open Finance. Você pode mudar a descrição e a categoria; ela some
-            daqui só se sair da fatura no banco.
+            Veio da fatura pelo Open Finance: valor, data e fatura seguem o banco. Descrição e
+            categoria são suas. Some daqui só se sair da fatura no banco.
           </span>
         </p>
       )}
-      <Campo rotulo="Cartão">
-        <Selecao
-          value={cartaoId}
-          onChange={(e) => {
-            setCartaoId(e.target.value);
-            setMesManual(null);
-          }}
-        >
-          {meus.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.nome}
-              {c.larId ? " (da casa)" : ""}
-            </option>
+      {doBanco && compra && (
+        <dl className="grid grid-cols-3 gap-4 rounded-lg border border-line p-4">
+          {(
+            [
+              [compra.valor < 0 ? "Estorno" : "Valor", formatar(Math.abs(compra.valor))],
+              ["Data", dataBR(compra.data)],
+              ["Fatura", nomeMes(compra.mesPrimeira)],
+            ] as const
+          ).map(([rotulo, valor]) => (
+            <div key={rotulo} className="min-w-0">
+              <dt className="text-xs text-ink-3">{rotulo}</dt>
+              <dd className="tabular truncate text-[13px]/5 font-semibold text-ink">{valor}</dd>
+            </div>
           ))}
-        </Selecao>
-      </Campo>
+        </dl>
+      )}
+      {!doBanco && (
+        <Campo rotulo="Cartão">
+          <Selecao
+            value={cartaoId}
+            onChange={(e) => {
+              setCartaoId(e.target.value);
+              setMesManual(null);
+            }}
+          >
+            {meus.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nome}
+                {c.larId ? " (da casa)" : ""}
+              </option>
+            ))}
+          </Selecao>
+        </Campo>
+      )}
 
       <Campo rotulo="Descrição">
         <Entrada
@@ -993,7 +1037,10 @@ export function FormCompra({
             setCatEscolhida(true);
           }}
         >
-          {CATEGORIAS.map((c) => (
+          {(CATEGORIAS.some((c) => c.id === cat)
+            ? CATEGORIAS
+            : [...CATEGORIAS, categoria(cat)]
+          ).map((c) => (
             <option key={c.id} value={c.id}>
               {c.nome}
             </option>
@@ -1001,56 +1048,60 @@ export function FormCompra({
         </Selecao>
       </Campo>
 
-      <Segmentado
-        cheio
-        rotulo="Tipo de cobrança"
-        valor={assinatura ? "assinatura" : "compra"}
-        onMudar={(v) => setAssinatura(v === "assinatura")}
-        opcoes={[
-          { valor: "compra", rotulo: "À vista ou parcelada" },
-          { valor: "assinatura", rotulo: "Assinatura mensal" },
-        ]}
-      />
-
-      <div className="grid grid-cols-2 gap-4">
-        <Campo rotulo={assinatura ? "Valor por mês" : "Valor total"}>
-          <EntradaValor valor={valor} onMudar={setValor} />
-        </Campo>
-        <Campo rotulo={assinatura ? "Data da primeira cobrança" : "Data da compra"}>
-          <Entrada
-            type="date"
-            value={data}
-            onChange={(e) => {
-              setData(e.target.value);
-              setMesManual(null);
-            }}
+      {!doBanco && (
+        <>
+          <Segmentado
+            cheio
+            rotulo="Tipo de cobrança"
+            valor={assinatura ? "assinatura" : "compra"}
+            onMudar={(v) => setAssinatura(v === "assinatura")}
+            opcoes={[
+              { valor: "compra", rotulo: "À vista ou parcelada" },
+              { valor: "assinatura", rotulo: "Assinatura mensal" },
+            ]}
           />
-        </Campo>
-      </div>
 
-      {!assinatura && (
-        <Campo
-          rotulo="Parcelas"
-          dica={
-            parcelas > 1 && valor > 0
-              ? `${parcelas}x de ${formatar(cadaParcela)}, sem juros no cálculo.`
-              : undefined
-          }
-        >
-          <EntradaNumero valor={parcelas} onMudar={setParcelas} min={1} max={48} sufixo="x" />
-        </Campo>
+          <div className="grid grid-cols-2 gap-4">
+            <Campo rotulo={assinatura ? "Valor por mês" : "Valor total"}>
+              <EntradaValor valor={valor} onMudar={setValor} />
+            </Campo>
+            <Campo rotulo={assinatura ? "Data da primeira cobrança" : "Data da compra"}>
+              <Entrada
+                type="date"
+                value={data}
+                onChange={(e) => {
+                  setData(e.target.value);
+                  setMesManual(null);
+                }}
+              />
+            </Campo>
+          </div>
+
+          {!assinatura && (
+            <Campo
+              rotulo="Parcelas"
+              dica={
+                parcelas > 1 && valor > 0
+                  ? `${parcelas}x de ${formatar(cadaParcela)}, sem juros no cálculo.`
+                  : undefined
+              }
+            >
+              <EntradaNumero valor={parcelas} onMudar={setParcelas} min={1} max={48} sufixo="x" />
+            </Campo>
+          )}
+
+          <Campo
+            rotulo="Primeira cobrança na fatura de"
+            dica={
+              mesManual && mesManual !== mesSugerido
+                ? `Pelo fechamento do cartão, seria ${nomeMes(mesSugerido).toLowerCase()}.`
+                : "Calculado pela data da compra e pelo fechamento do cartão."
+            }
+          >
+            <SeletorMes valor={mesPrimeira} onMudar={setMesManual} base={mes} />
+          </Campo>
+        </>
       )}
-
-      <Campo
-        rotulo="Primeira cobrança na fatura de"
-        dica={
-          mesManual && mesManual !== mesSugerido
-            ? `Pelo fechamento do cartão, seria ${nomeMes(mesSugerido).toLowerCase()}.`
-            : "Calculado pela data da compra e pelo fechamento do cartão."
-        }
-      >
-        <SeletorMes valor={mesPrimeira} onMudar={setMesManual} base={mes} />
-      </Campo>
 
       {compra?.recorrente && !compra.mesFim && (
         <button

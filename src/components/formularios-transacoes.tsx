@@ -6,7 +6,7 @@ import { useMemo, useRef, useState } from "react";
 import { EyeOff, FileUp, Landmark, Trash2 } from "lucide-react";
 import { useApp } from "@/lib/app";
 import { saldoCarteira } from "@/lib/calc-extra";
-import { CATEGORIAS, sugerirCategoria } from "@/lib/categorias";
+import { CATEGORIAS, categoria, sugerirCategoria } from "@/lib/categorias";
 import { novoId } from "@/lib/dados/backend";
 import { formatar } from "@/lib/dinheiro";
 import { adivinharColunas, lerCsv, lerExtrato, type Colunas } from "@/lib/importar";
@@ -60,11 +60,30 @@ export function FormTransacao({
   const [soSaldo, setSoSaldo] = useState(transacao?.soSaldo ?? false);
   const doBanco = !!transacao?.externoId;
 
-  const categorias = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS;
+  const listaBase = tipo === "entrada" ? CATEGORIAS_ENTRADA : CATEGORIAS;
+  // Categoria que não está na lista (ex.: "Transferência", vinda do banco)
+  // continua escolhida, em vez de virar "Outros" ao salvar.
+  const categorias = listaBase.some((c) => c.id === cat)
+    ? listaBase
+    : [...listaBase, categoria(cat)];
 
   const salvar = async () => {
+    // Do banco: valor, data, tipo e carteira seguem o banco; o resto é seu.
+    if (doBanco && transacao) {
+      if (!descricao.trim()) return avisar("Descreva a transação.", "erro");
+      onFechar();
+      await atualizar("transacoes", transacao.id, {
+        descricao: descricao.trim(),
+        categoria: cat,
+        observacao: observacao.trim(),
+        soSaldo,
+      });
+      avisar("Transação atualizada.");
+      return;
+    }
     if (valor <= 0) return avisar("Informe um valor maior que zero.", "erro");
-    if (tipo !== "transferencia" && !descricao.trim()) return avisar("Descreva a transação.", "erro");
+    if (tipo !== "transferencia" && !descricao.trim())
+      return avisar("Descreva a transação.", "erro");
     if (tipo === "transferencia" && (!carteiraId || !destinoId || carteiraId === destinoId)) {
       return avisar("Escolha duas carteiras diferentes para a transferência.", "erro");
     }
@@ -144,32 +163,47 @@ export function FormTransacao({
       {transacao?.externoId && (
         <p className="flex items-start gap-2 rounded-lg bg-primary-soft p-4 text-xs leading-5 text-primary-text">
           <Landmark size={16} className="mt-0.5 shrink-0" />
-          <span>Veio do banco pelo Open Finance. Você pode mudar a descrição e a categoria; para não contar no mês, use “Tirar do resumo”.</span>
+          <span>
+            Veio do banco pelo Open Finance: valor, data e carteira seguem o banco. Descrição,
+            categoria e anotação são suas.
+          </span>
         </p>
       )}
-      <Segmentado
-        cheio
-        rotulo="Tipo"
-        valor={tipo}
-        onMudar={(v) => {
-          setTipo(v);
-          if (!catEscolhida) setCat(v === "entrada" ? "renda" : "outros");
-        }}
-        opcoes={[
-          { valor: "saida", rotulo: "Saída" },
-          { valor: "entrada", rotulo: "Entrada" },
-          { valor: "transferencia", rotulo: "Transferência", desativado: carteiras.length < 2 },
-        ]}
-      />
+      {doBanco && transacao ? (
+        <ResumoDoBanco
+          itens={[
+            [transacao.tipo === "entrada" ? "Entrou" : "Saiu", formatar(transacao.valor)],
+            ["Data", dataBR(transacao.data)],
+            ["Carteira", carteiras.find((c) => c.id === transacao.carteiraId)?.nome ?? "—"],
+          ]}
+        />
+      ) : (
+        <>
+          <Segmentado
+            cheio
+            rotulo="Tipo"
+            valor={tipo}
+            onMudar={(v) => {
+              setTipo(v);
+              if (!catEscolhida) setCat(v === "entrada" ? "renda" : "outros");
+            }}
+            opcoes={[
+              { valor: "saida", rotulo: "Saída" },
+              { valor: "entrada", rotulo: "Entrada" },
+              { valor: "transferencia", rotulo: "Transferência", desativado: carteiras.length < 2 },
+            ]}
+          />
 
-      <div className="grid grid-cols-2 gap-4">
-        <Campo rotulo="Valor">
-          <EntradaValor valor={valor} onMudar={setValor} autoFocus={!transacao} />
-        </Campo>
-        <Campo rotulo="Data">
-          <Entrada type="date" value={data} onChange={(e) => setData(e.target.value)} />
-        </Campo>
-      </div>
+          <div className="grid grid-cols-2 gap-4">
+            <Campo rotulo="Valor">
+              <EntradaValor valor={valor} onMudar={setValor} autoFocus={!transacao} />
+            </Campo>
+            <Campo rotulo="Data">
+              <Entrada type="date" value={data} onChange={(e) => setData(e.target.value)} />
+            </Campo>
+          </div>
+        </>
+      )}
 
       <Campo rotulo={tipo === "transferencia" ? "Descrição (opcional)" : "Descrição"}>
         <Entrada
@@ -226,6 +260,7 @@ export function FormTransacao({
           </Campo>
         </div>
       ) : (
+        !doBanco &&
         carteiras.length > 0 && (
           <Campo
             rotulo={tipo === "entrada" ? "Entrou em" : "Saiu de"}
@@ -244,7 +279,11 @@ export function FormTransacao({
       )}
 
       <Campo rotulo="Anotação (opcional)">
-        <Entrada value={observacao} onChange={(e) => setObservacao(e.target.value)} maxLength={120} />
+        <Entrada
+          value={observacao}
+          onChange={(e) => setObservacao(e.target.value)}
+          maxLength={120}
+        />
       </Campo>
 
       {tipo !== "transferencia" && (
@@ -259,9 +298,28 @@ export function FormTransacao({
   );
 }
 
+function ResumoDoBanco({ itens }: { itens: [string, string][] }) {
+  return (
+    <dl className="grid grid-cols-3 gap-4 rounded-lg border border-line p-4">
+      {itens.map(([rotulo, valor]) => (
+        <div key={rotulo} className="min-w-0">
+          <dt className="text-xs text-ink-3">{rotulo}</dt>
+          <dd className="tabular truncate text-[13px]/5 font-semibold text-ink">{valor}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 /* ───────────────────────── Carteira ───────────────────────── */
 
-export function FormCarteira({ carteira, onFechar }: { carteira?: Carteira; onFechar: () => void }) {
+export function FormCarteira({
+  carteira,
+  onFechar,
+}: {
+  carteira?: Carteira;
+  onFechar: () => void;
+}) {
   const { dados, sessao, hoje, inserir, atualizar, remover, avisar } = useApp();
   const { abrir } = useModais();
   const [nome, setNome] = useState(carteira?.nome ?? "");
@@ -323,8 +381,10 @@ export function FormCarteira({ carteira, onFechar }: { carteira?: Carteira; onFe
       rotulo: "Excluir carteira",
       acao: async () => {
         for (const t of dados.transacoes) {
-          if (t.carteiraId === carteira.id) await atualizar("transacoes", t.id, { carteiraId: null });
-          if (t.carteiraDestinoId === carteira.id) await atualizar("transacoes", t.id, { carteiraDestinoId: null });
+          if (t.carteiraId === carteira.id)
+            await atualizar("transacoes", t.id, { carteiraId: null });
+          if (t.carteiraDestinoId === carteira.id)
+            await atualizar("transacoes", t.id, { carteiraDestinoId: null });
         }
         await remover("carteiras", carteira.id);
         avisar("Carteira excluída.");
@@ -335,7 +395,11 @@ export function FormCarteira({ carteira, onFechar }: { carteira?: Carteira; onFe
   return (
     <Modal
       titulo={carteira ? "Editar carteira" : "Nova carteira"}
-      descricao={carteira ? undefined : "Uma conta no banco, a poupança, o dinheiro na carteira ou um investimento."}
+      descricao={
+        carteira
+          ? undefined
+          : "Uma conta no banco, a poupança, o dinheiro na carteira ou um investimento."
+      }
       onFechar={onFechar}
       onEnviar={salvar}
       rodape={
@@ -421,7 +485,9 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
   const [colunas, setColunas] = useState<Colunas>({ data: 0, descricao: 1, valor: 2 });
   const [cabecalho, setCabecalho] = useState(true);
   const [inverter, setInverter] = useState(false);
-  const [ajustes, setAjustes] = useState<Record<number, { incluir?: boolean; categoria?: string }>>({});
+  const [ajustes, setAjustes] = useState<Record<number, { incluir?: boolean; categoria?: string }>>(
+    {},
+  );
   const [ocupado, setOcupado] = useState(false);
   const entrada = useRef<HTMLInputElement>(null);
 
@@ -440,7 +506,8 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
 
   const linhas = useMemo(() => {
     if (!tabela) return [];
-    const chave = (d: string, v: number, s: string) => `${d}|${v}|${s.toLowerCase().replace(/\s+/g, " ")}`;
+    const chave = (d: string, v: number, s: string) =>
+      `${d}|${v}|${s.toLowerCase().replace(/\s+/g, " ")}`;
     const existentes = new Set(dados.transacoes.map((t) => chave(t.data, t.valor, t.descricao)));
     return lerExtrato(tabela, colunas, cabecalho, inverter).linhas.map((l, i) => {
       const duplicada = existentes.has(chave(l.data, l.valor, l.descricao));
@@ -500,7 +567,14 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
       }
     >
       <div className="grid gap-4 sm:grid-cols-2">
-        <Campo rotulo="Carteira" dica={carteiras.length ? undefined : "Crie uma carteira em Carteiras para os saldos acompanharem."}>
+        <Campo
+          rotulo="Carteira"
+          dica={
+            carteiras.length
+              ? undefined
+              : "Crie uma carteira em Carteiras para os saldos acompanharem."
+          }
+        >
           <Selecao value={carteiraId} onChange={(e) => setCarteiraId(e.target.value)}>
             <option value="">Nenhuma carteira</option>
             {carteiras.map((c) => (
@@ -536,13 +610,17 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
         <>
           <details className="group rounded-2xl border border-line px-4 py-4">
             <summary className="cursor-pointer list-none text-[13px]/5 text-ink-2 [&::-webkit-details-marker]:hidden">
-              <span className="font-medium text-ink">Colunas do arquivo:</span> {nomesColunas[colunas.data]},{" "}
-              {nomesColunas[colunas.descricao]} e {nomesColunas[colunas.valor]}.{" "}
+              <span className="font-medium text-ink">Colunas do arquivo:</span>{" "}
+              {nomesColunas[colunas.data]}, {nomesColunas[colunas.descricao]} e{" "}
+              {nomesColunas[colunas.valor]}.{" "}
               <span className="font-medium text-primary-text group-open:hidden">Ajustar</span>
             </summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-3">
               {(["data", "descricao", "valor"] as const).map((campo) => (
-                <Campo key={campo} rotulo={campo === "data" ? "Data" : campo === "descricao" ? "Descrição" : "Valor"}>
+                <Campo
+                  key={campo}
+                  rotulo={campo === "data" ? "Data" : campo === "descricao" ? "Descrição" : "Valor"}
+                >
                   <Selecao
                     value={colunas[campo]}
                     onChange={(e) => {
@@ -560,7 +638,11 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
               ))}
             </div>
             <div className="mt-4 space-y-4">
-              <Alternar titulo="Primeira linha é o cabeçalho" ligado={cabecalho} onMudar={setCabecalho} />
+              <Alternar
+                titulo="Primeira linha é o cabeçalho"
+                ligado={cabecalho}
+                onMudar={setCabecalho}
+              />
               <Alternar
                 titulo="Inverter entradas e saídas"
                 descricao="Para bancos que mostram os gastos como valores positivos."
@@ -572,12 +654,20 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
 
           <ul className="divide-y divide-line rounded-2xl border border-line">
             {linhas.map((l, i) => (
-              <li key={i} className={cx("flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2", !l.incluir && "opacity-55")}>
+              <li
+                key={i}
+                className={cx(
+                  "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2",
+                  !l.incluir && "opacity-55",
+                )}
+              >
                 <input
                   type="checkbox"
                   aria-label={`Importar ${l.descricao}`}
                   checked={l.incluir}
-                  onChange={(e) => setAjustes((a) => ({ ...a, [i]: { ...a[i], incluir: e.target.checked } }))}
+                  onChange={(e) =>
+                    setAjustes((a) => ({ ...a, [i]: { ...a[i], incluir: e.target.checked } }))
+                  }
                   className="h-4 w-4 shrink-0 accent-[var(--primary)]"
                 />
                 <span className="min-w-0 flex-1 basis-40">
@@ -591,7 +681,9 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
                   <select
                     aria-label={`Categoria de ${l.descricao}`}
                     value={l.categoria}
-                    onChange={(e) => setAjustes((a) => ({ ...a, [i]: { ...a[i], categoria: e.target.value } }))}
+                    onChange={(e) =>
+                      setAjustes((a) => ({ ...a, [i]: { ...a[i], categoria: e.target.value } }))
+                    }
                     className="h-8 rounded-lg border border-line bg-surface px-2 text-xs text-ink-2 outline-none focus:border-primary"
                   >
                     {CATEGORIAS.map((c) => (
