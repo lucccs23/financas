@@ -16,6 +16,7 @@
 import {
   ajusteParaDisponivel,
   chaveLancamento,
+  comprasDaFatura,
   faturaDoMes,
   indexarLancamentos,
   mesPrimeiraFatura,
@@ -701,6 +702,41 @@ export function conferirCartoes(banco: Dados, conexoes: ConexaoBuscada[], hoje: 
         const b = (doBanco.get(m) ?? 0) / 100;
         const a = faturaDoMes(cartao.id, banco.compras, m) / 100;
         linhas.push(`  ${m}: banco ${b.toFixed(2)} · app ${a.toFixed(2)}${Math.abs(a - b) > 0.05 ? "  <- diferente" : ""}`);
+      }
+      // Item a item, na fatura do mês que vem: o que só um dos lados tem.
+      const alvo = addMes(mesHoje, 1);
+      const chave = (desc: string, v: number) => `${normalizar(semParcela(desc)).slice(0, 12)}|${v}`;
+      const sobra = new Map<string, number>();
+      for (const t of validas) {
+        const r = t.creditCardMetadata?.billForecastDate;
+        const m = ehMes(r) ? addMes(r, desloc) : mesPrimeiraFatura(cartao, data(t.date));
+        if (m !== alvo) continue;
+        const k = chave(t.description, centavos(t.amount) * (t.type === "CREDIT" ? -1 : 1));
+        sobra.set(k, (sobra.get(k) ?? 0) + 1);
+      }
+      for (const l of comprasDaFatura(cartao.id, banco.compras, alvo)) {
+        const k = chave(l.compra.descricao, l.valor);
+        sobra.set(k, (sobra.get(k) ?? 0) - 1);
+      }
+      const soBanco = [...sobra].filter(([, n]) => n > 0).map(([k, n]) => `${k} x${n}`);
+      const soApp = [...sobra].filter(([, n]) => n < 0).map(([k, n]) => `${k} x${-n}`);
+      if (soBanco.length) linhas.push(`  ${alvo} só no banco: ${soBanco.slice(0, 15).join("; ")}`);
+      if (soApp.length) {
+        linhas.push(`  ${alvo} só no app: ${soApp.slice(0, 15).join("; ")}`);
+        // Como essas compras do app foram montadas.
+        for (const l of comprasDaFatura(cartao.id, banco.compras, alvo)) {
+          const k = chave(l.compra.descricao, l.valor);
+          if ((sobra.get(k) ?? 0) >= 0) continue;
+          linhas.push(
+            `    app: ${k} total=${l.compra.valor} parc=${l.parcela ?? "-"}/${l.compra.parcelas} primeira=${l.compra.mesPrimeira} data=${l.compra.data} id=${l.compra.externoId?.slice(-28)}`,
+          );
+        }
+      }
+      // Créditos (não pagamento) e pagamentos, para ver como o banco escreve.
+      for (const t of transacoes.filter((t) => t.type === "CREDIT").slice(-6)) {
+        linhas.push(
+          `  crédito ${data(t.date)} ${t.amount} ${ehCompra(t) ? "estorno" : "pagamento"} cat=${t.category ?? "-"} desc=${t.description.slice(0, 26)}`,
+        );
       }
     }
   }
