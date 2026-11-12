@@ -170,7 +170,7 @@ describe("Open Finance", () => {
     expect(d.transacoes[0]).toMatchObject({ id: "manual", externoId: "a", carteiraId: d.carteiras[0].id });
   });
 
-  it("cartão: compra parcelada vira uma compra só, na fatura certa, e o limite bate com o banco", () => {
+  it("cartão: cada parcela entra na fatura que o banco indica, e o limite bate com o banco", () => {
     const d = base();
     const parcela = (n: number, mes: string): TransacaoPluggy =>
       tx({
@@ -205,15 +205,22 @@ describe("Open Finance", () => {
       ]),
       HOJE,
     );
-    expect(r).toMatchObject({ cartoesNovos: 1, compras: 3 });
+    expect(r).toMatchObject({ cartoesNovos: 1, compras: 5 });
     const k = d.cartoes[0];
     expect(k).toMatchObject({ limite: 500_000, diaFechamento: 3, diaVencimento: 10 });
 
-    const loja = d.compras.find((c) => c.parcelas === 10)!;
-    expect(loja).toMatchObject({ descricao: "LOJA X", valor: 100_000, mesPrimeira: "2026-07", categoria: "compras" });
-    expect(d.compras.filter((c) => c.parcelas === 10)).toHaveLength(1);
+    const loja = d.compras.filter((c) => c.descricao.startsWith("LOJA X"));
+    expect(loja.map((c) => [c.descricao, c.mesPrimeira, c.valor])).toEqual([
+      ["LOJA X · parcela 3/10", "2026-09", 10_000],
+      ["LOJA X · parcela 4/10", "2026-10", 10_000],
+      ["LOJA X · parcela 5/10", "2026-11", 10_000],
+    ]);
+    expect(loja[0].categoria).toBe("compras");
     // Estorno abate o Uber.
-    expect(d.compras.map((c) => c.valor).sort((a, b) => a - b)).toEqual([-2500, 2500, 100_000]);
+    expect(faturaDoMes(k.id, d.compras, "2026-11")).toBe(10_000);
+    // Busca que voltou vazia (falha) não apaga a fatura aberta.
+    aplicarOpenFinance(d, conexao([{ conta: cartao, transacoes: [] }]), HOJE);
+    expect(faturaDoMes(k.id, d.compras, "2026-11")).toBe(10_000);
 
     expect(limiteDoCartao(k, d, "2026-11").livre).toBe(410_000);
     expect(k.limiteConferidoEm).toBe(HOJE);

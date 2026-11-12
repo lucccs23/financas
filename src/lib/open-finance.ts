@@ -462,21 +462,24 @@ export function fechamentoPelasCompras(
   transacoes: TransacaoPluggy[],
   hoje: string,
 ): { dia: number; certo: boolean } | null {
-  const porRotulo = new Map<string, string[]>();
-  for (const t of transacoes) {
-    const m = t.creditCardMetadata;
-    if (t.type !== "DEBIT" || (m?.installmentNumber ?? 1) > 1 || !ehMes(m?.billForecastDate)) continue;
-    const dias = porRotulo.get(m!.billForecastDate!) ?? [];
-    dias.push(data(t.date));
-    porRotulo.set(m!.billForecastDate!, dias);
+  const debitos = transacoes.filter(
+    (t) => t.type === "DEBIT" && ehMes(t.creditCardMetadata?.billForecastDate) && data(t.date) <= hoje,
+  );
+  const aVista = debitos.filter((t) => (t.creditCardMetadata?.installmentNumber ?? 1) <= 1);
+  if (!aVista.length) return null;
+  const aberta = aVista.reduce((a, b) => (data(b.date) > data(a.date) ? b : a)).creditCardMetadata!
+    .billForecastDate!;
+  const datas = (rotulo: string) =>
+    debitos
+      .filter((t) => t.creditCardMetadata!.billForecastDate === rotulo)
+      .map((t) => data(t.date))
+      .sort();
+  const primeiraAberta = datas(aberta)[0];
+  const ultimaAnterior = datas(addMes(aberta, -1)).at(-1);
+  // Lançamentos dos dois lados da virada, poucos dias entre eles: dá para confiar.
+  if (ultimaAnterior && diasEntre(ultimaAnterior, primeiraAberta) <= 5) {
+    return { dia: dia(ultimaAnterior), certo: true };
   }
-  const rotulos = [...porRotulo.keys()].sort();
-  const aberta = rotulos.filter((r) => porRotulo.get(r)!.some((d) => d <= hoje)).pop();
-  if (!aberta) return null;
-  const primeiraAberta = porRotulo.get(aberta)!.sort()[0];
-  const anterior = porRotulo.get(addMes(aberta, -1))?.sort().at(-1);
-  // Compras dos dois lados da virada, poucos dias entre elas: dá para confiar.
-  if (anterior && diasEntre(anterior, primeiraAberta) <= 5) return { dia: dia(anterior), certo: true };
   return { dia: dia(somarDias(primeiraAberta, -1)), certo: false };
 }
 
@@ -560,8 +563,16 @@ function aplicarCartao(
     }
   }
 
-  // Chave estável de cada compra: não muda quando sai de "pendente" para
-  // "lançada" (o id do banco pode mudar). Compras iguais no mesmo dia ganham #2, #3...
+  // Modelo antigo (uma compra parcelada inteira, com as parcelas calculadas
+  // aqui): sai, e cada parcela volta como o banco lança.
+  banco.compras = banco.compras.filter(
+    (c) => !(c.cartaoId === doCartao.id && c.externoId && c.parcelas > 1),
+  );
+
+  // Cada lançamento do banco vira um lançamento na fatura que o banco indica:
+  // assim a fatura do app soma o mesmo que a do banco. A chave não muda quando
+  // o lançamento sai de "pendente" (o id do banco pode mudar); lançamentos
+  // iguais ganham #2, #3...
   const vistas = new Map<string, number>();
   const ordenadas = [...transacoes].filter(ehCompra).sort(
     (a, b) => data(a.date).localeCompare(data(b.date)) || a.id.localeCompare(b.id),
@@ -572,38 +583,29 @@ function aplicarCartao(
     const meta = t.creditCardMetadata ?? {};
     const parcelas = Math.max(1, meta.totalInstallments ?? 1);
     const numero = Math.min(parcelas, Math.max(1, meta.installmentNumber ?? 1));
-    const parcela = centavos(t.amount);
-    const total =
-      parcelas > 1
-        ? centavos(meta.totalAmount) >= parcela * 1.5
-          ? centavos(meta.totalAmount)
-          : parcela * parcelas
-        : parcela;
-    const valor = t.type === "CREDIT" ? -total : total; // estorno abate da fatura
-    const descricao = semParcela(t.description.trim()) || t.description.trim();
+    const valor = centavos(t.amount) * (t.type === "CREDIT" ? -1 : 1); // estorno abate
+    const base = semParcela(t.description.trim()) || t.description.trim();
+    const descricao = parcelas > 1 ? `${base} · parcela ${numero}/${parcelas}` : base;
     const compradoEm = data(meta.purchaseDate) || data(t.date);
-    const mesPrimeira = addMes(mesDaFatura(t), -(numero - 1));
 
-    // Uma compra parcelada aparece uma vez por fatura: a chave é a compra, não a parcela.
-    let chave = `${conta.id}|${compradoEm}|${valor}|${parcelas}|${normalizar(descricao)}`;
-    if (parcelas === 1) {
-      const n = (vistas.get(chave) ?? 0) + 1;
-      vistas.set(chave, n);
-      if (n > 1) chave += `#${n}`;
-    }
-    if (chaves.has(chave)) continue;
+    let chave =
+      parcelas > 1
+        ? `${conta.id}|${compradoEm}|${parcelas}|${normalizar(base)}|${numero}`
+        : `${conta.id}|${compradoEm}|${valor}|1|${normalizar(base)}`;
+    const n = (vistas.get(chave) ?? 0) + 1;
+    vistas.set(chave, n);
+    if (n > 1) chave += `#${n}`;
     chaves.add(chave);
 
+    const mesPrimeira = mesDaFatura(t);
     // Já veio antes (pela chave nova ou pelo id do banco, das primeiras buscas)?
     const existente = banco.compras.find(
       (c) => c.cartaoId === doCartao.id && (c.externoId === chave || c.externoId === t.id),
     );
     if (existente) {
       existente.externoId = chave;
-      // O banco manda: fatura e valor seguem o que ele informa.
-      existente.mesPrimeira = mesPrimeira;
+      existente.mesPrimeira = mesPrimeira; // o banco manda na fatura e no valor
       existente.valor = valor;
-      existente.parcelas = parcelas;
       continue;
     }
 
@@ -611,8 +613,8 @@ function aplicarCartao(
       (c) =>
         !c.externoId &&
         c.cartaoId === doCartao.id &&
+        c.parcelas === 1 &&
         c.valor === valor &&
-        c.parcelas === parcelas &&
         (c.mesPrimeira === mesPrimeira || diasEntre(c.data, compradoEm) <= 3),
     );
     if (manual) {
@@ -628,7 +630,7 @@ function aplicarCartao(
       larId: doCartao.larId,
       descricao,
       valor,
-      parcelas,
+      parcelas: 1,
       recorrente: false,
       mesPrimeira,
       mesFim: null,
@@ -639,14 +641,16 @@ function aplicarCartao(
     resumo.compras++;
   }
 
-  // Compra à vista que veio do banco e sumiu dele (autorização cancelada) sai
-  // também daqui, mas só das faturas ainda em aberto, que a busca cobre inteiras.
+  // Lançamento que veio do banco e sumiu dele (autorização cancelada, parcela
+  // antecipada) sai também daqui, mas só das faturas em aberto e futuras, que a
+  // busca cobre inteiras.
+  // Lista vazia é falha da busca, não fatura zerada: nesse caso nada sai.
   const abertaDesde = mesPrimeiraFatura(doCartao, hoje);
   banco.compras = banco.compras.filter(
     (c) =>
+      !ordenadas.length ||
       c.cartaoId !== doCartao.id ||
       !c.externoId ||
-      c.parcelas > 1 ||
       c.mesPrimeira < abertaDesde ||
       chaves.has(c.externoId),
   );
