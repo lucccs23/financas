@@ -79,7 +79,8 @@ export function comprasDaFatura(
       valor: valorParcela(compra, mes),
       parcela: numeroParcela(compra, mes),
     }))
-    .filter((l) => l.valor > 0)
+    // Estornos (valor negativo) também aparecem: abatem a fatura.
+    .filter((l) => l.valor !== 0)
     .sort((a, b) => b.compra.data.localeCompare(a.compra.data));
 }
 
@@ -538,7 +539,8 @@ export function gastosPorCategoria(dados: Dados, perfilId: Id, mes: Mes): GastoC
   /** Soma um item; se for fatura, distribui o valor pelas categorias das compras. */
   const distribuir = (item: ItemMes, valor: number) => {
     if (item.refTipo !== "fatura") return somar(item.categoria, valor);
-    const linhas = comprasDaFatura(item.refId, dados.compras, mes);
+    // Só as compras: o estorno já está descontado do valor da fatura.
+    const linhas = comprasDaFatura(item.refId, dados.compras, mes).filter((l) => l.valor > 0);
     const total = soma(linhas.map((l) => l.valor));
     if (total <= 0) return somar("outros", valor);
     let restante = valor;

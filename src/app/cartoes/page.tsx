@@ -97,7 +97,11 @@ export default function PaginaCartoes() {
         )}
       </CabecalhoPagina>
 
-      <Carrossel rotulo="Cartão" role="radiogroup" className="-mx-4 gap-4 px-4 py-2 sm:-mx-6 sm:px-6">
+      <Carrossel
+        rotulo="Cartão"
+        role="radiogroup"
+        className="-mx-4 gap-4 px-4 py-2 sm:-mx-6 sm:px-6"
+      >
         {cartoes.map((c) => {
           const i = info(c, mes);
           return (
@@ -109,7 +113,11 @@ export default function PaginaCartoes() {
               aria-label={`Cartão ${c.nome}`}
               onClick={(e) => {
                 setEscolhido(c.id);
-                e.currentTarget.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+                e.currentTarget.scrollIntoView({
+                  behavior: "smooth",
+                  inline: "nearest",
+                  block: "nearest",
+                });
               }}
               className={cx(
                 "w-76 max-w-[82vw] shrink-0 snap-start scroll-mx-6 rounded-2xl text-left transition-[opacity,transform] duration-200",
@@ -201,7 +209,11 @@ export default function PaginaCartoes() {
                     : "Calculado pelas parcelas e faturas ainda não pagas. Confira com o app do banco para ficar exato."}
                 </span>
                 {meu && (
-                  <Botao tamanho="sm" variante="fantasma" onClick={() => abrir({ tipo: "cartao", cartao, foco: "limite" })}>
+                  <Botao
+                    tamanho="sm"
+                    variante="fantasma"
+                    onClick={() => abrir({ tipo: "cartao", cartao, foco: "limite" })}
+                  >
                     Conferir limite
                   </Botao>
                 )}
@@ -223,7 +235,9 @@ export default function PaginaCartoes() {
                 const corpo = (
                   <>
                     <Ladrilho
-                      icone={compra.recorrente ? Repeat : categoria(compra.categoria ?? "outros").icone}
+                      icone={
+                        compra.recorrente ? Repeat : categoria(compra.categoria ?? "outros").icone
+                      }
                       className="max-sm:hidden"
                     />
                     <span className="min-w-0 flex-1">
@@ -232,11 +246,13 @@ export default function PaginaCartoes() {
                       </span>
                       <span className="block truncate text-xs text-ink-3">
                         {dataBR(compra.data)}
-                        {compra.recorrente
-                          ? " · assinatura"
-                          : parcela
-                            ? ` · total ${formatar(compra.valor)}`
-                            : ""}
+                        {valor < 0
+                          ? " · estorno"
+                          : compra.recorrente
+                            ? " · assinatura"
+                            : parcela
+                              ? ` · total ${formatar(compra.valor)}`
+                              : ""}
                       </span>
                     </span>
                     {parcela && (
@@ -244,8 +260,13 @@ export default function PaginaCartoes() {
                         {parcela}/{compra.parcelas}
                       </Etiqueta>
                     )}
-                    <span className="tabular w-26 text-right text-sm font-semibold whitespace-nowrap text-ink">
-                      {formatar(valor)}
+                    <span
+                      className={cx(
+                        "tabular w-26 text-right text-sm font-semibold whitespace-nowrap",
+                        valor < 0 ? "text-good-text" : "text-ink",
+                      )}
+                    >
+                      {valor < 0 ? `− ${formatar(-valor)}` : formatar(valor)}
                     </span>
                   </>
                 );

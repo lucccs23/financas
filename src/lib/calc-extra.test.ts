@@ -1,3 +1,4 @@
+import { faturaDoMes } from "./calc";
 import { describe, expect, it } from "vitest";
 import { gastosPorCategoria, resumoPessoal } from "./calc";
 import {
@@ -145,7 +146,14 @@ describe("resultado, recorrentes e fatura", () => {
       total: R(365),
       novas: R(45),
       herdadas: R(300),
+      estornos: 0,
     });
+  });
+  it("estorno abate o total sem bagunçar a composição", () => {
+    const estorno = { ...compras[0], id: "est", descricao: "Estorno", valor: -R(15), parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null };
+    const c = composicaoFatura({ id: "k" }, [...compras, estorno], MES);
+    expect(c).toMatchObject({ estornos: -R(15), total: R(350), avulsas: R(45), novas: R(45) });
+    expect(faturaDoMes("k", [...compras, estorno], MES)).toBe(c.total);
   });
   it("recorrentes dos próximos meses", () => {
     const d = base();

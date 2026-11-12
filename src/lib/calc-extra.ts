@@ -307,16 +307,20 @@ export interface ComposicaoFatura {
   novas: number;
   /** Parcelas de compras feitas em meses anteriores. */
   herdadas: number;
+  /** Estornos e créditos na fatura (negativo). */
+  estornos: number;
 }
 
 export function composicaoFatura(cartao: Pick<Cartao, "id">, compras: Compra[], mes: Mes): ComposicaoFatura {
-  const linhas = comprasDaFatura(cartao.id, compras, mes);
+  const todas = comprasDaFatura(cartao.id, compras, mes);
+  const linhas = todas.filter((l) => l.valor > 0);
   const de = (f: (c: Compra) => boolean) => soma(linhas.filter((l) => f(l.compra)).map((l) => l.valor));
   return {
+    estornos: soma(todas.filter((l) => l.valor < 0).map((l) => l.valor)),
     parcelas: de((c) => !c.recorrente && c.parcelas > 1),
     assinaturas: de((c) => c.recorrente),
     avulsas: de((c) => !c.recorrente && c.parcelas <= 1),
-    total: soma(linhas.map((l) => l.valor)),
+    total: soma(todas.map((l) => l.valor)),
     novas: de((c) => !c.recorrente && c.mesPrimeira === mes),
     herdadas: de((c) => !c.recorrente && diffMes(mes, c.mesPrimeira) > 0),
   };

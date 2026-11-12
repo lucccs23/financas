@@ -82,6 +82,8 @@ export function ComposicaoFatura({ cartao }: { cartao: Cartao }) {
   const { dados, mes } = useApp();
   const c = useMemo(() => composicaoFatura(cartao, dados.compras, mes), [cartao, dados.compras, mes]);
   if (c.total === 0) return null;
+  // As porcentagens são sobre as compras (antes dos estornos), para somarem 100%.
+  const bruto = c.parcelas + c.assinaturas + c.avulsas || 1;
   const partes = [
     { id: "parcelas", rotulo: "Parcelas", valor: c.parcelas, cor: "var(--s2)" },
     { id: "assinaturas", rotulo: "Assinaturas", valor: c.assinaturas, cor: "var(--s7)" },
@@ -104,6 +106,12 @@ export function ComposicaoFatura({ cartao }: { cartao: Cartao }) {
             <span>+ Assinaturas</span>
             <span className="font-medium text-ink">{formatar(c.assinaturas)}</span>
           </li>
+          {c.estornos < 0 && (
+            <li className="flex justify-between gap-4 text-ink-2">
+              <span>− Estornos e créditos</span>
+              <span className="font-medium text-good-text">{formatar(-c.estornos)}</span>
+            </li>
+          )}
           <li className="flex justify-between gap-4 border-t border-line pt-2 font-semibold text-ink">
             <span>Total da fatura</span>
             <span>{formatar(c.total)}</span>
@@ -122,7 +130,7 @@ export function ComposicaoFatura({ cartao }: { cartao: Cartao }) {
                 <Ponto cor={p.cor} /> {p.rotulo}
               </span>
               <span className="tabular text-ink">
-                <span className="mr-2 text-xs text-ink-3">{porcento(p.valor / c.total)}</span>
+                <span className="mr-2 text-xs text-ink-3">{porcento(p.valor / bruto)}</span>
                 <strong className="font-semibold">{formatar(p.valor)}</strong>
               </span>
             </li>
