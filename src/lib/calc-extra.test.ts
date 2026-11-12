@@ -2,6 +2,7 @@ import { faturaDoMes } from "./calc";
 import { describe, expect, it } from "vitest";
 import { gastosPorCategoria, resumoPessoal } from "./calc";
 import {
+  lancamentosDaCategoria,
   agruparPorDia,
   composicaoFatura,
   dicasDoMes,
@@ -159,6 +160,23 @@ describe("resultado, recorrentes e fatura", () => {
       MES,
     );
     expect(c).toMatchObject({ parcelas: R(140), avulsas: R(50), novas: R(90), herdadas: R(100), total: R(190) });
+  });
+  it("lista o que forma uma categoria: transações, compras do cartão e contas", () => {
+    const d = base();
+    d.cartoes = [{ id: "k", perfilId: "eu", larId: null, nome: "Gold", banco: "Nubank", cor: 0, limite: 0, diaFechamento: 28, diaVencimento: 5 }];
+    d.compras = [
+      { ...compras[0], id: "c1", descricao: "Mercado X · parcela 2/3", valor: R(30), parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null, categoria: "mercado" },
+      { ...compras[0], id: "c2", descricao: "Cinema", valor: R(40), parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null, categoria: "lazer" },
+    ];
+    d.transacoes = [
+      t({ valor: R(12), data: `${MES}-03`, categoria: "mercado", descricao: "Padaria" }),
+      t({ valor: R(99), data: `${MES}-04`, categoria: "mercado", descricao: "Entre contas", soSaldo: true }),
+    ];
+    const l = lancamentosDaCategoria(d, "eu", MES, "mercado");
+    expect(l.map((x) => [x.descricao, x.valor, x.origem])).toEqual([
+      ["Mercado X", R(30), "Nubank Gold"],
+      ["Padaria", R(12), "Transação"],
+    ]);
   });
   it("estorno abate o total sem bagunçar a composição", () => {
     const estorno = { ...compras[0], id: "est", descricao: "Estorno", valor: -R(15), parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null };

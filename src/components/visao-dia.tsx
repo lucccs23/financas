@@ -20,7 +20,13 @@ import {
 } from "lucide-react";
 import { useApp, usePerfil } from "@/lib/app";
 import { gastosPorCategoria, resumoPessoal } from "@/lib/calc";
-import { agruparPorDia, dicasDoMes, resultadoDoMes, ritmoDeGasto } from "@/lib/calc-extra";
+import {
+  agruparPorDia,
+  dicasDoMes,
+  lancamentosDaCategoria,
+  resultadoDoMes,
+  ritmoDeGasto,
+} from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { compacto, formatar, porcento } from "@/lib/dinheiro";
 import { addMes, dataBR, dataISO, intervalo, mesCurto, mesEixo, nomeMes } from "@/lib/meses";
@@ -286,6 +292,13 @@ export function DistribuicaoGastos() {
   const { dados, mes } = useApp();
   const perfil = usePerfil();
   const [foco, setFoco] = useState<string | null>(null);
+  // Categoria aberta para ver o que tem dentro.
+  const [aberta, setAberta] = useState<string | null>(null);
+  const dentro = useMemo(
+    () =>
+      aberta && aberta !== "_outras" ? lancamentosDaCategoria(dados, perfil.id, mes, aberta) : [],
+    [aberta, dados, perfil.id, mes],
+  );
 
   const { fatias, total } = useMemo(() => {
     const lista = gastosPorCategoria(dados, perfil.id, mes);
@@ -386,39 +399,76 @@ export function DistribuicaoGastos() {
             {fatias.map((f) => {
               const subiu = f.antes > 0 && f.valor > f.antes;
               const caiu = f.antes > 0 && f.valor < f.antes;
+              const podeAbrir = f.id !== "_outras";
+              const estaAberta = aberta === f.id;
               return (
                 <li
                   key={f.id}
                   onMouseEnter={() => setFoco(f.id)}
                   onMouseLeave={() => setFoco(null)}
                   className={cx(
-                    "flex items-center gap-2 border-b border-line py-2 text-[13px]/5 transition-opacity last:border-0",
-                    foco && foco !== f.id && "opacity-50",
+                    "border-b border-line text-[13px]/5 transition-opacity last:border-0",
+                    foco && foco !== f.id && !estaAberta && "opacity-50",
                   )}
                 >
-                  <Ponto cor={corDe(f.cor)} tamanho={8} />
-                  <span className="min-w-0 flex-1 truncate text-ink">{f.nome}</span>
-                  <span className="tabular text-xs text-ink-3">{porcento(f.valor / total)}</span>
-                  <span className="tabular w-22 text-right font-semibold text-ink">
-                    {formatar(f.valor, { semCentavos: true })}
-                  </span>
-                  <span
-                    className="w-4 shrink-0"
-                    title={
-                      subiu
-                        ? `Subiu ${formatar(f.valor - f.antes)} em relação ao mês anterior`
-                        : caiu
-                          ? `Caiu ${formatar(f.antes - f.valor)} em relação ao mês anterior`
-                          : undefined
-                    }
+                  <button
+                    type="button"
+                    disabled={!podeAbrir}
+                    aria-expanded={podeAbrir ? estaAberta : undefined}
+                    title={podeAbrir ? "Ver o que entra nesta categoria" : undefined}
+                    onClick={() => setAberta(estaAberta ? null : f.id)}
+                    className="flex w-full items-center gap-2 rounded-lg py-2 text-left enabled:cursor-pointer enabled:hover:bg-surface-2"
                   >
-                    {subiu && (
-                      <TrendingUp size={16} className="text-warn-text" aria-label="subiu" />
-                    )}
-                    {caiu && (
-                      <TrendingDown size={16} className="text-good-text" aria-label="caiu" />
-                    )}
-                  </span>
+                    <Ponto cor={corDe(f.cor)} tamanho={8} />
+                    <span className="min-w-0 flex-1 truncate text-ink">{f.nome}</span>
+                    <span className="tabular text-xs text-ink-3">{porcento(f.valor / total)}</span>
+                    <span className="tabular w-22 text-right font-semibold text-ink">
+                      {formatar(f.valor, { semCentavos: true })}
+                    </span>
+                    <span
+                      className="w-4 shrink-0"
+                      title={
+                        subiu
+                          ? `Subiu ${formatar(f.valor - f.antes)} em relação ao mês anterior`
+                          : caiu
+                            ? `Caiu ${formatar(f.antes - f.valor)} em relação ao mês anterior`
+                            : undefined
+                      }
+                    >
+                      {subiu && (
+                        <TrendingUp size={16} className="text-warn-text" aria-label="subiu" />
+                      )}
+                      {caiu && (
+                        <TrendingDown size={16} className="text-good-text" aria-label="caiu" />
+                      )}
+                    </span>
+                  </button>
+                  {estaAberta && (
+                    <ul className="mb-2 ml-4 border-l border-line pl-4">
+                      {dentro.slice(0, 6).map((l, i) => (
+                        <li key={i} className="flex items-center gap-2 py-1 text-xs">
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-ink-2">{l.descricao}</span>
+                            <span className="block truncate text-[11px]/4 text-ink-3">
+                              {l.origem}
+                            </span>
+                          </span>
+                          <span className="tabular font-medium text-ink">{formatar(l.valor)}</span>
+                        </li>
+                      ))}
+                      {dentro.length > 6 && (
+                        <li className="py-1 text-[11px]/4 text-ink-3">
+                          e mais {dentro.length - 6}{" "}
+                          {dentro.length - 6 === 1 ? "lançamento" : "lançamentos"}
+                        </li>
+                      )}
+                      {dentro.length === 0 && (
+                        <li className="py-1 text-xs text-ink-3">
+                          Vem da sua parte nas contas da casa.
+                        </li>
+                      )}
+                    </ul>
+                  )}
                 </li>
               );
             })}

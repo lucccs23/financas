@@ -4,7 +4,9 @@
 
 import {
   comprasDaFatura,
+  nomeDoCartao,
   parcelaDaCompra,
+  semSufixoDeParcela,
   faturaDoMes,
   gastosPorCategoria,
   itensDoMes,
@@ -340,6 +342,48 @@ export function composicaoFatura(
       (c) => !c.recorrente && (diffMes(mes, c.mesPrimeira) > 0 || (parcela(c)?.numero ?? 1) > 1),
     ),
   };
+}
+
+export interface LancamentoDaCategoria {
+  descricao: string;
+  valor: number;
+  /** De onde veio: o cartão, a carteira ou "Conta". */
+  origem: string;
+}
+
+/**
+ * O que forma uma categoria no mês, do maior para o menor: transações do dia
+ * a dia, compras nas faturas dos seus cartões e contas pessoais.
+ */
+export function lancamentosDaCategoria(
+  dados: Dados,
+  perfilId: Id,
+  mes: Mes,
+  cat: string,
+): LancamentoDaCategoria[] {
+  const lista: LancamentoDaCategoria[] = [];
+  for (const t of dados.transacoes) {
+    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo) continue;
+    if (t.data.slice(0, 7) !== mes || t.categoria !== cat) continue;
+    const carteira = dados.carteiras.find((c) => c.id === t.carteiraId);
+    lista.push({ descricao: t.descricao, valor: t.valor, origem: carteira?.nome ?? "Transação" });
+  }
+  for (const k of dados.cartoes.filter((c) => c.perfilId === perfilId)) {
+    for (const l of comprasDaFatura(k.id, dados.compras, mes)) {
+      if (l.valor <= 0 || (l.compra.categoria ?? "outros") !== cat) continue;
+      lista.push({
+        descricao: semSufixoDeParcela(l.compra.descricao),
+        valor: l.valor,
+        origem: nomeDoCartao(k),
+      });
+    }
+  }
+  for (const i of itensDoMes(dados, mes)) {
+    if (i.refTipo !== "conta" || i.escopo !== "pessoal" || i.natureza !== "despesa") continue;
+    if (i.perfilId !== perfilId || i.categoria !== cat) continue;
+    lista.push({ descricao: i.nome, valor: i.valor, origem: "Conta" });
+  }
+  return lista.sort((a, b) => b.valor - a.valor);
 }
 
 /** Transações agrupadas por dia, do mais recente para o mais antigo. */
