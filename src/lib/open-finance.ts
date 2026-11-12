@@ -662,6 +662,51 @@ function aplicarCartao(
   }
 }
 
+/* ───────────────────────── Conferência ───────────────────────── */
+
+/**
+ * Para conferir com o app do banco: por cartão e fatura (mês do vencimento),
+ * a soma do que o banco mandou e a soma do app. Pagamentos de fatura ficam de fora.
+ */
+export function conferirCartoes(banco: Dados, conexoes: ConexaoBuscada[], hoje: string): string[] {
+  const linhas: string[] = [];
+  const mesHoje = hoje.slice(0, 7);
+  for (const conexao of conexoes) {
+    for (const { conta, transacoes } of conexao.contas) {
+      if (conta.type !== "CREDIT") continue;
+      const cartao = banco.cartoes.find((c) => c.externoId === conta.id);
+      if (!cartao) continue;
+      const limite = somarDias(hoje, -45);
+      const validas = transacoes.filter(
+        (t) =>
+          t.amount !== 0 &&
+          ehCompra(t) &&
+          (t.status !== "PENDING" ||
+            (t.creditCardMetadata?.totalInstallments ?? 1) > 1 ||
+            data(t.date) >= limite),
+      );
+      const desloc = deslocamentoDoRotulo(validas, cartao, hoje);
+      const doBanco = new Map<Mes, number>();
+      for (const t of validas) {
+        const r = t.creditCardMetadata?.billForecastDate;
+        const m = ehMes(r) ? addMes(r, desloc) : mesPrimeiraFatura(cartao, data(t.date));
+        const v = centavos(t.amount) * (t.type === "CREDIT" ? -1 : 1);
+        doBanco.set(m, (doBanco.get(m) ?? 0) + v);
+      }
+      linhas.push(
+        `${cartao.banco} ${cartao.nome}: fecha ${cartao.diaFechamento}, vence ${cartao.diaVencimento}, rótulo ${desloc >= 0 ? "+" : ""}${desloc}`,
+      );
+      for (let i = -1; i <= 2; i++) {
+        const m = addMes(mesHoje, i);
+        const b = (doBanco.get(m) ?? 0) / 100;
+        const a = faturaDoMes(cartao.id, banco.compras, m) / 100;
+        linhas.push(`  ${m}: banco ${b.toFixed(2)} · app ${a.toFixed(2)}${Math.abs(a - b) > 0.05 ? "  <- diferente" : ""}`);
+      }
+    }
+  }
+  return linhas;
+}
+
 /* ───────────────────────── Contas e faturas pagas ───────────────────────── */
 
 function marcarPago(
