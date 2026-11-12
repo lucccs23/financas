@@ -9,7 +9,7 @@
 const PAGINAS = "financas-paginas-v1";
 const ARQUIVOS = "financas-arquivos-v1";
 const ESCOPO = new URL(self.registration.scope).pathname; // ex.: "/financas/"
-const ROTAS = ["", "transacoes/", "carteiras/", "cartoes/", "contas/", "casa/", "fluxo/", "reserva/", "renda/"];
+const ROTAS = ["", "transacoes/", "carteiras/", "cartoes/", "contas/", "casa/", "fluxo/", "analises/", "reserva/", "renda/"];
 
 /** Arquivos que uma página usa (scripts e estilos do Next). */
 function arquivosDa(html) {
