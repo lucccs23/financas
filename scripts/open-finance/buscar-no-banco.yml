@@ -61,6 +61,8 @@ jobs:
         run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
       - name: Gravar nos dados
         working-directory: dados
+        env:
+          DIAGNOSTICO: ${{ inputs.diagnostico && '1' || '' }}
         run: |
           git config user.name "Busca no banco"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

@@ -16,6 +16,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { normalizar as normalizarBanco } from "../src/lib/dados/operacoes";
 import {
   aplicarOpenFinance,
+  conferirCartoes,
   type ConexaoBuscada,
   type ContaPluggy,
   nomeDoBanco,
@@ -247,6 +248,7 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
 
   const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10); // horário de Brasília
   const importado = aplicarOpenFinance(banco, prontas, hoje);
+  if (process.env.DIAGNOSTICO) for (const l of conferirCartoes(banco, prontas, hoje)) console.log(l);
   writeFileSync(arquivo, JSON.stringify(banco, null, 1));
 
   const status: StatusOpenFinance = {
