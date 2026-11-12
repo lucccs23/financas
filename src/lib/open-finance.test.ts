@@ -407,6 +407,23 @@ describe("Open Finance", () => {
         HOJE2,
       );
       expect(d.compras.map((c) => c.valor)).toEqual([57_160]);
+
+      // Se uma versão anterior tinha gravado o pagamento como estorno, ele sai.
+      d.compras.push({
+        ...d.compras[0],
+        id: "velho",
+        valor: -13_382,
+        mesPrimeira: "2026-11",
+        externoId: "pg",
+      });
+      aplicarOpenFinance(
+        d,
+        conexao([
+          { conta: cartaoSemFechamento("2026-11-07"), transacoes: [compra("a", "2026-11-05", 571.6, "2026-11"), pagamento] },
+        ]),
+        HOJE2,
+      );
+      expect(d.compras.map((c) => c.valor)).toEqual([57_160]);
     });
 
     it("autorização pendente antiga e esquecida não entra", () => {

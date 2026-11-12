@@ -553,6 +553,21 @@ function aplicarCartao(
     return ehMes(rotulo) ? addMes(rotulo, deslocamento) : mesPrimeiraFatura(doCartao, data(t.date));
   };
 
+  // Pagamento que uma versão anterior leu como estorno: sai das faturas.
+  const pagamentos = new Set(
+    transacoes
+      .filter((t) => !ehCompra(t))
+      .flatMap((t) => {
+        const base = semParcela(t.description.trim()) || t.description.trim();
+        const quando = data(t.creditCardMetadata?.purchaseDate) || data(t.date);
+        const chave = `${conta.id}|${quando}|${-centavos(t.amount)}|1|${normalizar(base)}`;
+        return [t.id, chave, `${chave}#2`, `${chave}#3`];
+      }),
+  );
+  banco.compras = banco.compras.filter(
+    (c) => !(c.cartaoId === doCartao.id && c.externoId && pagamentos.has(c.externoId)),
+  );
+
   // Pagamento da fatura feito ao cartão: a fatura anterior está paga.
   for (const t of transacoes) {
     if (ehCompra(t) || t.status === "PENDING") continue;
