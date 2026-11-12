@@ -91,6 +91,24 @@ export const useBuscaNoBanco = () => useContext(Contexto);
 
 /** Quanto esperar a busca no GitHub antes de desistir de acompanhar. */
 const LIMITE_MS = 8 * 60_000;
+/** Ao abrir o app, busca sozinho se a última busca for mais velha que isto. */
+const VELHA_MS = 6 * 3_600_000;
+/** Entre duas buscas automáticas, neste aparelho, pelo menos isto. */
+const INTERVALO_AUTO_MS = 30 * 60_000;
+const CHAVE_AUTO = "financas-busca-automatica";
+
+/** A busca de abertura pode rodar agora? (marca a vez neste aparelho) */
+function vezDaBuscaAutomatica(status: StatusOpenFinance, agora = Date.now()) {
+  if (agora - Date.parse(status.buscadoEm) < VELHA_MS) return false;
+  try {
+    const ultima = Number(localStorage.getItem(CHAVE_AUTO) ?? 0);
+    if (agora - ultima < INTERVALO_AUTO_MS) return false;
+    localStorage.setItem(CHAVE_AUTO, String(agora));
+  } catch {
+    // Sem armazenamento no aparelho: busca mesmo assim.
+  }
+  return true;
+}
 
 export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
   const { backend, recarregar, avisar } = useApp();
@@ -101,6 +119,7 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
   const [endereco, setEndereco] = useState<string | null>(null);
   const [falhou, setFalhou] = useState(false);
   const relogio = useRef<ReturnType<typeof setInterval> | null>(null);
+  const buscarSeVelha = useRef<(s: StatusOpenFinance | null) => void>(() => undefined);
 
   const lerStatus = useCallback(async () => {
     if (!of) return null;
@@ -116,16 +135,19 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!of) return;
     let vivo = true;
-    of.status()
-      .then((s) => vivo && setStatus(s))
-      .catch(() => undefined);
+    const ler = () =>
+      of
+        .status()
+        .then((s) => {
+          if (!vivo) return;
+          setStatus(s);
+          buscarSeVelha.current(s);
+        })
+        .catch(() => undefined);
+    void ler();
     // Ao voltar para o app, a hora da última busca (e o aviso de parada) se atualiza.
     const aoVoltar = () => {
-      if (document.visibilityState === "visible" && !relogio.current) {
-        of.status()
-          .then((s) => vivo && setStatus(s))
-          .catch(() => undefined);
-      }
+      if (document.visibilityState === "visible" && !relogio.current) void ler();
     };
     document.addEventListener("visibilitychange", aoVoltar);
     return () => {
@@ -142,9 +164,13 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
     setFase(null);
   }, []);
 
-  const atualizar = useCallback(async () => {
+  /**
+   * Busca agora. "automatico": a busca que o app pede sozinho ao abrir; não
+   * avisa ao começar, e no fim só avisa se vier algo novo.
+   */
+  const buscar = useCallback(async (automatico: boolean, base: StatusOpenFinance | null) => {
     if (!of || relogio.current) return;
-    const antes = status?.buscadoEm ?? null;
+    const antes = base?.buscadoEm ?? null;
     const pedidaEm = Date.now();
     setBuscando(true);
     setFalhou(false);
@@ -152,11 +178,13 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
     try {
       await of.buscarAgora();
     } catch (e) {
-      avisar(e instanceof Error ? e.message : "Não foi possível iniciar a busca.", "erro");
+      if (!automatico)
+        avisar(e instanceof Error ? e.message : "Não foi possível iniciar a busca.", "erro");
       terminar();
       return;
     }
-    avisar("Buscando os dados mais novos: leva uns 2 minutos. Pode continuar usando o app.");
+    if (!automatico)
+      avisar("Buscando os dados mais novos: leva uns 2 minutos. Pode continuar usando o app.");
 
     relogio.current = setInterval(async () => {
       // Como anda a busca no GitHub (a desta vez: pedida há pouco).
@@ -185,19 +213,31 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
         const n = s.importado;
         const novos = n ? n.transacoes + n.compras : 0;
         const noBanco = bancosAtualizadosEm(s);
-        avisar(
-          novos
-            ? `Pronto: ${novos} ${novos === 1 ? "movimentação nova" : "movimentações novas"} dos bancos.`
-            : `Pronto: nada novo.${noBanco ? ` O Meu Pluggy falou com os bancos ${quando(noBanco)}.` : ""}`,
-        );
+        if (novos || !automatico)
+          avisar(
+            novos
+              ? `Pronto: ${novos} ${novos === 1 ? "movimentação nova" : "movimentações novas"} dos bancos.`
+              : `Pronto: nada novo.${noBanco ? ` O Meu Pluggy falou com os bancos ${quando(noBanco)}.` : ""}`,
+          );
         return;
       }
       if (Date.now() - pedidaEm > LIMITE_MS) {
         terminar();
-        avisar("A busca está demorando. Os dados aparecem sozinhos quando ela terminar.", "erro");
+        if (!automatico)
+          avisar("A busca está demorando. Os dados aparecem sozinhos quando ela terminar.", "erro");
       }
     }, 10_000);
-  }, [of, status, avisar, terminar, lerStatus, recarregar]);
+  }, [of, avisar, terminar, lerStatus, recarregar]);
+
+  const atualizar = useCallback(() => buscar(false, status), [buscar, status]);
+
+  // A busca automática do GitHub (7h, 13h e 19h) pode atrasar ou nem rodar:
+  // ao abrir o app (ou voltar a ele), se a última busca for velha, busca sozinho.
+  useEffect(() => {
+    buscarSeVelha.current = (s) => {
+      if (s && !relogio.current && vezDaBuscaAutomatica(s)) void buscar(true, s);
+    };
+  }, [buscar]);
 
   const valor = useMemo(
     () => ({ disponivel: !!of && !!status, status, buscando, fase, endereco, falhou, atualizar }),
@@ -245,8 +285,8 @@ export function PainelOpenFinance() {
               <span className="font-medium text-primary-text">{fase}</span>
             ) : (
               <>
-                Última busca {quando(status.buscadoEm)}. O app busca sozinho às 7h, 13h e 19h,
-                e &quot;Atualizar&quot; busca na hora. Os bancos passam os dados ao Meu Pluggy
+                Última busca {quando(status.buscadoEm)}. O app busca sozinho às 7h, 13h e 19h e
+                ao abrir, se a última tiver mais de 6 horas; &quot;Atualizar&quot; busca na hora. Os bancos passam os dados ao Meu Pluggy
                 sozinhos, em geral uma vez por dia: a hora de cada um está abaixo.
               </>
             )}

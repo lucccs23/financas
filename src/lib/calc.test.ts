@@ -348,6 +348,16 @@ describe("valores por mês e avisos", () => {
       ["luz", "2026-12", 2],
     ]);
   });
+  it("na virada do mês, avisa também o que vence no começo do mês que vem", () => {
+    const lista = alertas(d, "eu", "2026-12-29", 15);
+    expect(lista.map((a) => [a.item.nome, a.mes, a.dias])).toEqual([
+      ["luz", "2026-11", -47],
+      ["academia", "2026-11", -29],
+      ["luz", "2026-12", -17],
+      ["academia", "2026-12", 2],
+      ["luz", "2027-01", 14],
+    ]);
+  });
 });
 
 describe("histórico de renda", () => {

@@ -745,7 +745,13 @@ export function alertas(dados: Dados, perfilId: Id, hoje: string, janela = 5): A
     const dias = item.dia - dia;
     if (dias <= janela) lista.push({ item, mes, dias });
   }
-  return lista.sort((a, b) => a.dias - b.dias);
+  // Na virada do mês, as do começo do mês que vem também (no dia 30, a que vence dia 2).
+  const proximo = addMes(mes, 1);
+  for (const item of abertas(proximo)) {
+    const dias = item.dia + diasNoMes(mes) - dia;
+    if (dias <= janela) lista.push({ item, mes: proximo, dias });
+  }
+  return lista.filter((a) => a.item.valor > 0).sort((a, b) => a.dias - b.dias);
 }
 
 /* ───────────────────────── Reserva ───────────────────────── */

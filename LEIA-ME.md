@@ -219,6 +219,24 @@ O resultado fica na pasta `.next-online`.
 com login por e-mail, em vez do repositório dos dados. Em **Authentication >
 URL Configuration**, coloque o endereço do site em **Site URL**.
 
+### Outra pessoa da casa começar a usar
+
+Exemplo: sua irmã, no celular dela.
+
+1. **Uma chave só para ela.** Gere outra chave como no passo 2 acima (mesmo
+   repositório, mesma permissão) e dê o nome dela à chave. Assim, se ela perder
+   o celular, você apaga só a dela. Mande a chave por um canal privado.
+2. **No celular dela:** ela abre `https://SEU-USUARIO.github.io/financas/`,
+   informa o repositório dos dados (`seu-usuario/financas-dados`), cola a chave
+   e cria o perfil dela. Depois, **Instalar app** (veja abaixo).
+3. **Casa:** se vocês dividem contas, em **Casa** você cria a casa (se ainda não
+   tem) e cadastra os moradores; ela entra com o código da casa e escolhe quem é.
+4. **Bancos dela (opcional):** veja o fim de "Open Finance", abaixo.
+
+Os dados ficam num arquivo só. O app mostra a cada um só o que é dele (veja "O
+que cada um enxerga"), mas quem tem a chave pode, tecnicamente, ler o arquivo
+inteiro no GitHub. O app foi pensado para quem confia um no outro.
+
 ### Usar como aplicativo
 
 **No celular (Android, Chrome):** abra o endereço do site, toque nos três pontos
@@ -250,7 +268,10 @@ gratuito para uso pessoal.
 **Como funciona:** uma tarefa automática no repositório **privado** dos dados
 ([scripts/open-finance/buscar-no-banco.yml](scripts/open-finance/buscar-no-banco.yml))
 roda às 7h, 13h e 19h. Ela pega na Pluggy o que mudou nos últimos 90 dias e
-grava no `financas.json`. A chave secreta da Pluggy fica só nos segredos desse
+grava no `financas.json`. O GitHub pode atrasar ou pular esses horários; por
+isso o app também pede uma busca sozinho ao abrir, se a última tiver mais de 6
+horas (no máximo uma a cada meia hora por aparelho), sem avisar nada a não ser
+que cheguem movimentações novas. A chave secreta da Pluggy fica só nos segredos desse
 repositório, nunca no site.
 
 **Botão Atualizar** (o ícone de setas no topo, ou em Carteiras): busca na hora
@@ -303,9 +324,20 @@ Meu Pluggy e depois toque em Atualizar.
    Read and write**). Com a permissão **Actions: Read** a mais, o botão também
    mostra o andamento (na fila, buscando) e o link de uma busca que falhou.
 
-Para conectar os bancos de outra pessoa da casa, ela faz os passos 1 e 3 na
-conta dela do Meu Pluggy, autorizando a mesma aplicação, e você acrescenta as
-conexões dela em `PLUGGY_CONEXOES` com o nome do perfil dela.
+**Bancos de outra pessoa da casa** (ela precisa ter criado o perfil no app):
+
+1. Ela cria a conta dela em **meu.pluggy.ai** e conecta os bancos dela lá.
+2. Com ela junto: no **seu** painel da Pluggy, na aplicação **Demo**, conecte o
+   **MeuPluggy** de novo, uma vez para cada banco dela, mas entrando com o login
+   **dela** do Meu Pluggy. Cada conexão nova tem um *item id*.
+3. Em `PLUGGY_CONEXOES`, acrescente uma linha por conexão dela, com o nome do
+   perfil dela exatamente como está no app:
+
+   ```
+   id-da-conexao-dela = Nome dela
+   ```
+
+4. Toque em **Atualizar**. As contas e cartões dela aparecem só no perfil dela.
 
 > O painel de desenvolvedor da Pluggy começa com 15 dias de teste. Pela
 > documentação do Meu Pluggy, a busca continua funcionando depois disso; se a

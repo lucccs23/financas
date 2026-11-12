@@ -50,10 +50,14 @@ import {
 } from "lucide-react";
 import { useApp } from "@/lib/app";
 import { alertas } from "@/lib/calc";
-import { limitesDoMes } from "@/lib/calc-extra";
+import { avisoDeAbertura, limitesDoMes } from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { buscaParada } from "@/lib/open-finance";
-import { BotaoAtualizar, BuscaNoBancoProvider, useBuscaNoBanco } from "./open-finance";
+import {
+  BotaoAtualizar,
+  BuscaNoBancoProvider,
+  useBuscaNoBanco,
+} from "./open-finance";
 import { formatar } from "@/lib/dinheiro";
 import { addMes, anoDe, nomeMes } from "@/lib/meses";
 import {
@@ -69,7 +73,17 @@ import { LEMA_APP, Logo, NOME_APP } from "./marca";
 import { Busca } from "./busca";
 import { ModaisProvider } from "./modais";
 import { useModais } from "./modais-contexto";
-import { Avatar, Botao, BotaoIcone, cx, Marcador, Menu, Painel, Ponto, type ItemMenu } from "./ui";
+import {
+  Avatar,
+  Botao,
+  BotaoIcone,
+  cx,
+  Marcador,
+  Menu,
+  Painel,
+  Ponto,
+  type ItemMenu,
+} from "./ui";
 
 interface ItemNav {
   href: string;
@@ -80,8 +94,18 @@ interface ItemNav {
 
 const MENU: ItemNav[] = [
   { href: "/", rotulo: "Visão geral", curto: "Início", icone: LayoutGrid },
-  { href: "/transacoes", rotulo: "Transações", curto: "Extrato", icone: ArrowLeftRight },
-  { href: "/fluxo", rotulo: "Fluxo de caixa", curto: "Fluxo", icone: ChartColumn },
+  {
+    href: "/transacoes",
+    rotulo: "Transações",
+    curto: "Extrato",
+    icone: ArrowLeftRight,
+  },
+  {
+    href: "/fluxo",
+    rotulo: "Fluxo de caixa",
+    curto: "Fluxo",
+    icone: ChartColumn,
+  },
   { href: "/cartoes", rotulo: "Cartões", icone: CreditCard },
   { href: "/carteiras", rotulo: "Carteiras", icone: Wallet },
   { href: "/casa", rotulo: "Casa", icone: House },
@@ -131,7 +155,10 @@ function useOrdemGuardada(perfilId: string | undefined) {
   const chave = `financas:menu:${perfilId ?? "-"}`;
   const [ordem, setOrdem] = useState<OrdemMenu>(() => {
     try {
-      return normalizarOrdem(JSON.parse(localStorage.getItem(chave) ?? "null"), ORDEM_PADRAO);
+      return normalizarOrdem(
+        JSON.parse(localStorage.getItem(chave) ?? "null"),
+        ORDEM_PADRAO,
+      );
     } catch {
       return ORDEM_PADRAO;
     }
@@ -240,7 +267,8 @@ function ativo(caminho: string, href: string): boolean {
  */
 function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
   const caminho = usePathname();
-  const { ordem, mudar, organizando, setOrganizando, arraste, setArraste } = useOrdem();
+  const { ordem, mudar, organizando, setOrganizando, arraste, setArraste } =
+    useOrdem();
   const itens = ordem[grupo].map((href) => ITENS.get(href)!).filter(Boolean);
   const alvo = arraste?.alvo?.grupo === grupo ? arraste.alvo.indice : null;
   const primeiro = ordem.menu[0] ?? ordem.ajustes[0];
@@ -254,7 +282,9 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
   };
   const soltar = () => {
     if (arraste?.alvo)
-      mudar(moverItem(ordem, arraste.href, arraste.alvo.grupo, arraste.alvo.indice));
+      mudar(
+        moverItem(ordem, arraste.href, arraste.alvo.grupo, arraste.alvo.indice),
+      );
     setArraste(null);
   };
 
@@ -288,7 +318,9 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
           <li
             className={cx(
               "grid h-10 place-items-center rounded-lg border border-dashed text-xs text-ink-3",
-              alvo !== null ? "border-primary text-primary-text" : "border-line-strong",
+              alvo !== null
+                ? "border-primary text-primary-text"
+                : "border-line-strong",
             )}
           >
             Solte um item aqui
@@ -313,7 +345,10 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
                 const caixa = e.currentTarget.getBoundingClientRect();
                 apontar(e.clientY > caixa.top + caixa.height / 2 ? i + 1 : i);
               }}
-              className={cx("group relative flex items-center gap-1", arrastando && "opacity-40")}
+              className={cx(
+                "group relative flex items-center gap-1",
+                arrastando && "opacity-40",
+              )}
             >
               {/* Onde o item vai cair. */}
               {alvo === i && (
@@ -336,7 +371,10 @@ function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
                 <item.icone
                   size={16}
                   strokeWidth={aqui ? 2.3 : 2}
-                  className={cx("shrink-0", aqui ? "text-primary" : "text-ink-3")}
+                  className={cx(
+                    "shrink-0",
+                    aqui ? "text-primary" : "text-ink-3",
+                  )}
                 />
                 <span className="min-w-0 flex-1 truncate">{item.rotulo}</span>
                 {!organizando && (
@@ -387,7 +425,11 @@ function FimOrganizar() {
       >
         Restaurar padrão
       </Botao>
-      <Botao tamanho="sm" variante="primario" onClick={() => setOrganizando(false)}>
+      <Botao
+        tamanho="sm"
+        variante="primario"
+        onClick={() => setOrganizando(false)}
+      >
         Pronto
       </Botao>
     </div>
@@ -405,8 +447,16 @@ function BarraLateral() {
   };
 
   const itensPerfil: (ItemMenu | "divisor")[] = [
-    { rotulo: "Perfil e renda", icone: UserRound, acao: () => router.push("/renda") },
-    { rotulo: "Aparência", icone: Palette, acao: () => abrir({ tipo: "aparencia" }) },
+    {
+      rotulo: "Perfil e renda",
+      icone: UserRound,
+      acao: () => router.push("/renda"),
+    },
+    {
+      rotulo: "Aparência",
+      icone: Palette,
+      acao: () => abrir({ tipo: "aparencia" }),
+    },
     "divisor",
     {
       rotulo: modo === "nuvem" ? "Sair" : "Trocar de perfil",
@@ -417,7 +467,10 @@ function BarraLateral() {
 
   return (
     <div className="flex h-full flex-col rounded-card border border-line bg-surface p-4 shadow-card">
-      <Link href="/" className="mb-6 flex items-center gap-4 rounded-lg px-2 pt-2 pb-1">
+      <Link
+        href="/"
+        className="mb-6 flex items-center gap-4 rounded-lg px-2 pt-2 pb-1"
+      >
         <Logo tamanho={40} />
         <span>
           <span className="block text-[15px] leading-5 font-semibold tracking-[-0.02em] text-ink">
@@ -446,7 +499,11 @@ function BarraLateral() {
         <span className="ml-auto mr-2 sm:hidden">
           <BotaoOcultar />
         </span>
-        <div role="radiogroup" aria-label="Tema" className="flex rounded-full bg-surface-2 p-1">
+        <div
+          role="radiogroup"
+          aria-label="Tema"
+          className="flex rounded-full bg-surface-2 p-1"
+        >
           {(
             [
               ["claro", Sun, "Claro"],
@@ -486,14 +543,23 @@ function BarraLateral() {
               onClick={abrir}
               className="flex w-full items-center gap-4 rounded-lg p-2 text-left transition-colors hover:bg-surface-2"
             >
-              <Avatar nome={perfil?.nome ?? "?"} cor={perfil?.cor ?? 0} tamanho={32} />
+              <Avatar
+                nome={perfil?.nome ?? "?"}
+                cor={perfil?.cor ?? 0}
+                tamanho={32}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-semibold text-ink">
                   {perfil?.nome}
                 </span>
                 <span className="flex items-center gap-2 text-xs text-ink-3">
-                  <Ponto cor={lar ? "var(--good)" : "var(--warn)"} tamanho={8} />
-                  <span className="truncate">{lar ? lar.nome : "Sem casa ainda"}</span>
+                  <Ponto
+                    cor={lar ? "var(--good)" : "var(--warn)"}
+                    tamanho={8}
+                  />
+                  <span className="truncate">
+                    {lar ? lar.nome : "Sem casa ainda"}
+                  </span>
                 </span>
               </span>
               <ChevronsUpDown size={16} className="shrink-0 text-ink-3" />
@@ -538,7 +604,9 @@ function Cabecalho({ abrirGaveta }: { abrirGaveta: () => void }) {
         className="ml-2 truncate rounded-lg text-left text-lg font-semibold tracking-[-0.03em] text-ink disabled:cursor-default sm:ml-2 sm:text-[26px]/8"
       >
         <span className="max-[400px]:hidden">{nomeMes(mes)}</span>
-        <span className="min-[401px]:hidden">{nomeMes(mes).slice(0, 3)}</span>{" "}
+        <span className="min-[401px]:hidden">
+          {nomeMes(mes).slice(0, 3)}
+        </span>{" "}
         <span className="font-normal text-ink-3">{anoDe(mes)}</span>
       </button>
       {mes !== mesHoje && (
@@ -573,8 +641,11 @@ export function prazo(dias: number): string {
   return `vence em ${dias} dias`;
 }
 
+/** Neste aparelho, o dia em que o aviso de abertura já apareceu. */
+const CHAVE_AVISO_DO_DIA = "financas-aviso-do-dia";
+
 function Sino() {
-  const { dados, perfil, hoje, marcarPago } = useApp();
+  const { dados, perfil, hoje, marcarPago, avisar } = useApp();
   const [aberto, setAberto] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const lista = useMemo(
@@ -585,7 +656,9 @@ function Sino() {
   const estourados = useMemo(
     () =>
       perfil && hoje
-        ? limitesDoMes(dados, perfil.id, hoje.slice(0, 7)).filter((l) => l.fracao > 1)
+        ? limitesDoMes(dados, perfil.id, hoje.slice(0, 7)).filter(
+            (l) => l.fracao > 1,
+          )
         : [],
     [dados, perfil, hoje],
   );
@@ -594,10 +667,36 @@ function Sino() {
   const parada = !!busca.status && !busca.buscando && buscaParada(busca.status);
   const total = lista.length + estourados.length + (parada ? 1 : 0);
 
+  // Ao abrir o app, uma vez por dia: o que atrasou ou vence hoje e amanhã.
+  // Espera os dados do GitHub chegarem (a cópia do aparelho pode estar velha).
+  const listaAtual = useRef(lista);
+  useEffect(() => {
+    listaAtual.current = lista;
+  }, [lista]);
+  useEffect(() => {
+    if (!hoje) return;
+    const espera = setTimeout(() => {
+      try {
+        if (localStorage.getItem(CHAVE_AVISO_DO_DIA) === hoje) return;
+        const texto = avisoDeAbertura(listaAtual.current);
+        if (!texto) return;
+        localStorage.setItem(CHAVE_AVISO_DO_DIA, hoje);
+        avisar(
+          texto,
+          listaAtual.current.some((a) => a.dias < 0) ? "erro" : "ok",
+        );
+      } catch {
+        // Sem armazenamento no aparelho: sem aviso de abertura.
+      }
+    }, 6000);
+    return () => clearTimeout(espera);
+  }, [hoje, avisar]);
+
   useEffect(() => {
     if (!aberto) return;
     const fora = (e: MouseEvent) => {
-      if (raiz.current && !raiz.current.contains(e.target as Node)) setAberto(false);
+      if (raiz.current && !raiz.current.contains(e.target as Node))
+        setAberto(false);
     };
     const tecla = (e: KeyboardEvent) => e.key === "Escape" && setAberto(false);
     document.addEventListener("mousedown", fora);
@@ -679,8 +778,14 @@ function Sino() {
               <p className="text-sm font-semibold text-ink">Limites passados</p>
               <ul className="mt-2 space-y-2">
                 {estourados.map((l) => (
-                  <li key={l.categoria} className="flex items-center gap-2 text-[13px]/5">
-                    <TriangleAlert size={16} className="shrink-0 text-warn-text" />
+                  <li
+                    key={l.categoria}
+                    className="flex items-center gap-2 text-[13px]/5"
+                  >
+                    <TriangleAlert
+                      size={16}
+                      className="shrink-0 text-warn-text"
+                    />
                     <span className="min-w-0 flex-1 truncate text-ink-2">
                       {categoria(l.categoria).nome}
                     </span>
@@ -695,10 +800,16 @@ function Sino() {
           )}
           {parada && (
             <div className="flex items-start gap-2 border-t border-line px-4 py-4 text-[13px]/5">
-              <TriangleAlert size={16} className="mt-0.5 shrink-0 text-warn-text" />
+              <TriangleAlert
+                size={16}
+                className="mt-0.5 shrink-0 text-warn-text"
+              />
               <p className="text-ink-2">
                 A busca no banco não roda há mais de 12 horas. Veja em{" "}
-                <Link href="/carteiras" className="font-medium text-primary-text underline">
+                <Link
+                  href="/carteiras"
+                  className="font-medium text-primary-text underline"
+                >
                   Carteiras
                 </Link>
                 .
@@ -767,7 +878,8 @@ function Adicionar() {
 
   const guardar = () => {
     if (dados.metas.length === 0) abrir({ tipo: "meta" });
-    else if (dados.metas.length === 1) abrir({ tipo: "aporte", metaId: dados.metas[0].id });
+    else if (dados.metas.length === 1)
+      abrir({ tipo: "aporte", metaId: dados.metas[0].id });
     else router.push("/reserva");
   };
 
@@ -796,7 +908,9 @@ function Adicionar() {
       : []),
     {
       rotulo: temCartao ? "Compra no cartão" : "Novo cartão",
-      descricao: temCartao ? "À vista, parcelada ou assinatura" : "Cadastre para lançar compras",
+      descricao: temCartao
+        ? "À vista, parcelada ou assinatura"
+        : "Cadastre para lançar compras",
       icone: CreditCard,
       acao: () => abrir(temCartao ? { tipo: "compra" } : { tipo: "cartao" }),
     },
@@ -820,7 +934,11 @@ function Adicionar() {
       largura={268}
       itens={itens}
       gatilho={(alternar) => (
-        <Botao variante="primario" onClick={alternar} className="max-sm:!w-10 max-sm:!px-0">
+        <Botao
+          variante="primario"
+          onClick={alternar}
+          className="max-sm:!w-10 max-sm:!px-0"
+        >
           <Plus size={16} strokeWidth={2.4} />
           <span className="max-sm:hidden">Adicionar</span>
           <ChevronDown size={16} className="-mr-1 opacity-80 max-sm:hidden" />

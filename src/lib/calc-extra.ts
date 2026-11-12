@@ -18,7 +18,15 @@ import {
   valorParcela,
 } from "./calc";
 import { addMes, diasNoMes, diffMes } from "./meses";
-import type { Carteira, Cartao, Compra, Dados, Id, Mes, Transacao } from "./types";
+import type {
+  Carteira,
+  Cartao,
+  Compra,
+  Dados,
+  Id,
+  Mes,
+  Transacao,
+} from "./types";
 
 const soma = (ns: number[]) => ns.reduce((a, b) => a + b, 0);
 
@@ -42,15 +50,26 @@ export interface Ritmo {
   porDia: number;
 }
 
-export function ritmoDeGasto(dados: Dados, perfilId: Id, mes: Mes, hoje: string): Ritmo {
+export function ritmoDeGasto(
+  dados: Dados,
+  perfilId: Id,
+  mes: Mes,
+  hoje: string,
+): Ritmo {
   const r = resumoPessoal(dados, perfilId, mes);
   const dias = diasNoMes(mes);
   const mesHoje = hoje.slice(0, 7);
-  const diaAtual = mes < mesHoje ? dias : mes > mesHoje ? 0 : Number(hoje.slice(8, 10));
+  const diaAtual =
+    mes < mesHoje ? dias : mes > mesHoje ? 0 : Number(hoje.slice(8, 10));
 
   const porDia = Array.from({ length: dias }, () => 0);
   for (const t of dados.transacoes ?? []) {
-    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo || t.data.slice(0, 7) !== mes)
+    if (
+      t.perfilId !== perfilId ||
+      t.tipo !== "saida" ||
+      t.soSaldo ||
+      t.data.slice(0, 7) !== mes
+    )
       continue;
     const d = Math.min(dias, Math.max(1, Number(t.data.slice(8, 10))));
     porDia[d - 1] += t.valor;
@@ -82,7 +101,11 @@ export function ritmoDeGasto(dados: Dados, perfilId: Id, mes: Mes, hoje: string)
 /* ───────────────────────── Carteiras e patrimônio ───────────────────────── */
 
 /** Saldo de uma carteira: saldo inicial + entradas − saídas, com transferências. */
-export function saldoCarteira(carteira: Carteira, transacoes: Transacao[], ate?: string): number {
+export function saldoCarteira(
+  carteira: Carteira,
+  transacoes: Transacao[],
+  ate?: string,
+): number {
   let saldo = carteira.saldoInicial;
   for (const t of transacoes) {
     if (ate && t.data > ate) continue;
@@ -90,7 +113,8 @@ export function saldoCarteira(carteira: Carteira, transacoes: Transacao[], ate?:
       if (t.tipo === "entrada") saldo += t.valor;
       else saldo -= t.valor; // saída ou transferência que sai daqui
     }
-    if (t.tipo === "transferencia" && t.carteiraDestinoId === carteira.id) saldo += t.valor;
+    if (t.tipo === "transferencia" && t.carteiraDestinoId === carteira.id)
+      saldo += t.valor;
   }
   return saldo;
 }
@@ -103,19 +127,32 @@ export interface Patrimonio {
   total: number;
 }
 
-export function patrimonio(dados: Dados, perfilId: Id, mesHoje: Mes): Patrimonio {
+export function patrimonio(
+  dados: Dados,
+  perfilId: Id,
+  mesHoje: Mes,
+): Patrimonio {
   const carteiras = soma(
     dados.carteiras
       .filter((c) => c.perfilId === perfilId && !c.arquivada)
       .map((c) => saldoCarteira(c, dados.transacoes)),
   );
   const reserva = soma(
-    dados.metas.filter((m) => m.perfilId === perfilId).map((m) => saldoDaMeta(m, dados)),
+    dados.metas
+      .filter((m) => m.perfilId === perfilId)
+      .map((m) => saldoDaMeta(m, dados)),
   );
   const dividaCartoes = soma(
-    dados.cartoes.filter((c) => c.perfilId === perfilId).map((c) => limiteUsado(c, dados, mesHoje)),
+    dados.cartoes
+      .filter((c) => c.perfilId === perfilId)
+      .map((c) => limiteUsado(c, dados, mesHoje)),
   );
-  return { carteiras, reserva, dividaCartoes, total: carteiras + reserva - dividaCartoes };
+  return {
+    carteiras,
+    reserva,
+    dividaCartoes,
+    total: carteiras + reserva - dividaCartoes,
+  };
 }
 
 /* ───────────────────────── Resultado do mês ───────────────────────── */
@@ -129,7 +166,11 @@ export interface Resultado {
   variacao: number | null;
 }
 
-export function resultadoDoMes(dados: Dados, perfilId: Id, mes: Mes): Resultado {
+export function resultadoDoMes(
+  dados: Dados,
+  perfilId: Id,
+  mes: Mes,
+): Resultado {
   const atual = resumoPessoal(dados, perfilId, mes);
   const antes = resumoPessoal(dados, perfilId, addMes(mes, -1));
   return {
@@ -137,7 +178,10 @@ export function resultadoDoMes(dados: Dados, perfilId: Id, mes: Mes): Resultado 
     gasto: atual.saidas,
     resultado: atual.sobra,
     anterior: antes.sobra,
-    variacao: antes.sobra !== 0 ? (atual.sobra - antes.sobra) / Math.abs(antes.sobra) : null,
+    variacao:
+      antes.sobra !== 0
+        ? (atual.sobra - antes.sobra) / Math.abs(antes.sobra)
+        : null,
   };
 }
 
@@ -173,7 +217,10 @@ export function dicasDoMes(
         tom: "alerta",
         texto: `Os gastos do dia a dia passaram **${formatar(-ritmo.restante)}** da reserva do mês.`,
       });
-    } else if (ritmo.gasto > ritmo.ideal * 1.15 && ritmo.diaAtual < ritmo.diasNoMes) {
+    } else if (
+      ritmo.gasto > ritmo.ideal * 1.15 &&
+      ritmo.diaAtual < ritmo.diasNoMes
+    ) {
       lista.push({
         id: "ritmo",
         tom: "alerta",
@@ -189,9 +236,14 @@ export function dicasDoMes(
   }
 
   // Categoria que mais cresceu em relação ao mês anterior.
-  const agora = gastosPorCategoria(dados, perfilId, mes).filter((g) => g.categoria !== "dia-a-dia");
+  const agora = gastosPorCategoria(dados, perfilId, mes).filter(
+    (g) => g.categoria !== "dia-a-dia",
+  );
   const antes = new Map(
-    gastosPorCategoria(dados, perfilId, addMes(mes, -1)).map((g) => [g.categoria, g.valor]),
+    gastosPorCategoria(dados, perfilId, addMes(mes, -1)).map((g) => [
+      g.categoria,
+      g.valor,
+    ]),
   );
   const subidas = agora
     .map((g) => ({
@@ -225,7 +277,8 @@ export function dicasDoMes(
 
   // Fatura bem acima da média dos três meses anteriores.
   const meus = dados.cartoes.filter((c) => c.perfilId === perfilId);
-  const fatura = (m: Mes) => soma(meus.map((c) => faturaDoMes(c.id, dados.compras, m)));
+  const fatura = (m: Mes) =>
+    soma(meus.map((c) => faturaDoMes(c.id, dados.compras, m)));
   const media = soma([1, 2, 3].map((n) => fatura(addMes(mes, -n)))) / 3;
   const atual = fatura(mes);
   if (media > 0 && atual > media * 1.25 && atual - media >= 10_000) {
@@ -276,7 +329,11 @@ export interface PontoRecorrente {
   parcelas: number;
 }
 
-export function recorrentesPorMes(dados: Dados, perfilId: Id, meses: Mes[]): PontoRecorrente[] {
+export function recorrentesPorMes(
+  dados: Dados,
+  perfilId: Id,
+  meses: Mes[],
+): PontoRecorrente[] {
   const eu = dados.moradores.find((m) => m.perfilId === perfilId);
   const meus = dados.cartoes.filter((c) => c.perfilId === perfilId);
   return meses.map((mes) => {
@@ -296,11 +353,17 @@ export function recorrentesPorMes(dados: Dados, perfilId: Id, meses: Mes[]): Pon
     const parcelas = soma(
       meus.flatMap((k) =>
         dados.compras
-          .filter((c) => c.cartaoId === k.id && (c.recorrente || c.parcelas > 1))
+          .filter(
+            (c) => c.cartaoId === k.id && (c.recorrente || c.parcelas > 1),
+          )
           .map((c) => valorParcela(c, mes)),
       ),
     );
-    return { mes, contasFixas: soma(pessoais.map((i) => i.valor)) + parteCasa, parcelas };
+    return {
+      mes,
+      contasFixas: soma(pessoais.map((i) => i.valor)) + parteCasa,
+      parcelas,
+    };
   });
 }
 
@@ -337,9 +400,16 @@ export function composicaoFatura(
     assinaturas: de((c) => c.recorrente),
     avulsas: de((c) => !c.recorrente && !parcela(c)),
     total: soma(todas.map((l) => l.valor)),
-    novas: de((c) => !c.recorrente && c.mesPrimeira === mes && (parcela(c)?.numero ?? 1) === 1),
+    novas: de(
+      (c) =>
+        !c.recorrente &&
+        c.mesPrimeira === mes &&
+        (parcela(c)?.numero ?? 1) === 1,
+    ),
     herdadas: de(
-      (c) => !c.recorrente && (diffMes(mes, c.mesPrimeira) > 0 || (parcela(c)?.numero ?? 1) > 1),
+      (c) =>
+        !c.recorrente &&
+        (diffMes(mes, c.mesPrimeira) > 0 || (parcela(c)?.numero ?? 1) > 1),
     ),
   };
 }
@@ -363,7 +433,10 @@ export function salarioRecebido(dados: Dados, perfilId: Id, mes: Mes): number {
  * O salário que caiu é diferente do cadastrado em Minha renda? Pequenas
  * diferenças (até 2% ou R$ 1) não contam.
  */
-export function salarioDiferente(recebido: number, cadastrado: number): boolean {
+export function salarioDiferente(
+  recebido: number,
+  cadastrado: number,
+): boolean {
   if (recebido <= 0) return false;
   const diferenca = Math.abs(recebido - cadastrado);
   return diferenca > 100 && diferenca > cadastrado * 0.02;
@@ -378,9 +451,15 @@ export interface LimiteCategoria {
 }
 
 /** Limites de gasto por categoria do mês, com quanto já foi gasto em cada uma. */
-export function limitesDoMes(dados: Dados, perfilId: Id, mes: Mes): LimiteCategoria[] {
+export function limitesDoMes(
+  dados: Dados,
+  perfilId: Id,
+  mes: Mes,
+): LimiteCategoria[] {
   const perfil = dados.perfis.find((p) => p.id === perfilId);
-  const limites = Object.entries(perfil?.limites ?? {}).filter(([, v]) => v > 0);
+  const limites = Object.entries(perfil?.limites ?? {}).filter(
+    ([, v]) => v > 0,
+  );
   if (!limites.length) return [];
   const gastos = new Map(
     gastosPorCategoria(dados, perfilId, mes).map((g) => [g.categoria, g.valor]),
@@ -415,7 +494,11 @@ export function lancamentosDaCategoria(
     if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo) continue;
     if (t.data.slice(0, 7) !== mes || t.categoria !== cat) continue;
     const carteira = dados.carteiras.find((c) => c.id === t.carteiraId);
-    lista.push({ descricao: t.descricao, valor: t.valor, origem: carteira?.nome ?? "Transação" });
+    lista.push({
+      descricao: t.descricao,
+      valor: t.valor,
+      origem: carteira?.nome ?? "Transação",
+    });
   }
   for (const k of dados.cartoes.filter((c) => c.perfilId === perfilId)) {
     for (const l of comprasDaFatura(k.id, dados.compras, mes)) {
@@ -428,7 +511,12 @@ export function lancamentosDaCategoria(
     }
   }
   for (const i of itensDoMes(dados, mes)) {
-    if (i.refTipo !== "conta" || i.escopo !== "pessoal" || i.natureza !== "despesa") continue;
+    if (
+      i.refTipo !== "conta" ||
+      i.escopo !== "pessoal" ||
+      i.natureza !== "despesa"
+    )
+      continue;
     if (i.perfilId !== perfilId || i.categoria !== cat) continue;
     lista.push({ descricao: i.nome, valor: i.valor, origem: "Conta" });
   }
@@ -436,9 +524,13 @@ export function lancamentosDaCategoria(
 }
 
 /** Transações agrupadas por dia, do mais recente para o mais antigo. */
-export function agruparPorDia(transacoes: Transacao[]): { data: string; itens: Transacao[] }[] {
+export function agruparPorDia(
+  transacoes: Transacao[],
+): { data: string; itens: Transacao[] }[] {
   const grupos = new Map<string, Transacao[]>();
-  for (const t of [...transacoes].sort((a, b) => b.data.localeCompare(a.data))) {
+  for (const t of [...transacoes].sort((a, b) =>
+    b.data.localeCompare(a.data),
+  )) {
     const lista = grupos.get(t.data) ?? [];
     lista.push(t);
     grupos.set(t.data, lista);
@@ -447,3 +539,38 @@ export function agruparPorDia(transacoes: Transacao[]): { data: string; itens: T
 }
 
 export { movimentoAvulso };
+
+/* ───────────────────────── Aviso ao abrir ───────────────────────── */
+
+/** "Fatura Nubank vence hoje", "2 contas atrasadas e 1 vence amanhã"... */
+export function avisoDeAbertura(
+  lista: { item: { nome: string }; dias: number }[],
+) {
+  const atrasadas = lista.filter((a) => a.dias < 0);
+  const hoje = lista.filter((a) => a.dias === 0);
+  const amanha = lista.filter((a) => a.dias === 1);
+  if (!atrasadas.length && !hoje.length && !amanha.length) return null;
+  const partes: string[] = [];
+  const contas = (n: number) => (n === 1 ? "1 conta" : `${n} contas`);
+  if (atrasadas.length)
+    partes.push(
+      `${contas(atrasadas.length)} ${atrasadas.length === 1 ? "atrasada" : "atrasadas"}`,
+    );
+  if (hoje.length)
+    partes.push(
+      hoje.length === 1
+        ? `${hoje[0].item.nome} vence hoje`
+        : `${contas(hoje.length)} vencem hoje`,
+    );
+  if (amanha.length)
+    partes.push(
+      amanha.length === 1
+        ? `${amanha[0].item.nome} vence amanhã`
+        : `${contas(amanha.length)} vencem amanhã`,
+    );
+  const texto =
+    partes.length > 1
+      ? `${partes.slice(0, -1).join(", ")} e ${partes.at(-1)}`
+      : partes[0];
+  return `${texto[0].toUpperCase()}${texto.slice(1)}. Veja no sino.`;
+}

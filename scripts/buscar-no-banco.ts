@@ -325,11 +325,18 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
   const prontas: ConexaoBuscada[] = [];
   for (const c of lido.conexoes) {
     if (c.erro) continue;
+    // Sem nome na linha: com um perfil só, é dele; com mais, fica com quem já
+    // recebeu as contas desta conexão (assim a entrada de outra pessoa no app
+    // não tira os bancos de quem já usava).
+    const ids = new Set(c.contas.map((x) => x.conta.id));
+    const dono =
+      banco.carteiras.find((k) => k.externoId && ids.has(k.externoId))?.perfilId ??
+      banco.cartoes.find((k) => k.externoId && ids.has(k.externoId))?.perfilId;
     const perfil = c.perfil
       ? banco.perfis.find((p) => semAcento(p.nome) === semAcento(c.perfil))
       : banco.perfis.length === 1
         ? banco.perfis[0]
-        : undefined;
+        : banco.perfis.find((p) => p.id === dono);
     if (!perfil) {
       c.situacao = "erro";
       c.erro = c.perfil
