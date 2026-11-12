@@ -22,7 +22,7 @@ on:
         type: boolean
         default: false
       atualizar_no_banco:
-        description: "Pedir aos bancos dados novos antes de buscar (o botão Atualizar do app liga)"
+        description: "Pedir aos bancos dados novos antes de buscar (não vale para conexões do Meu Pluggy)"
         type: boolean
         default: false
 

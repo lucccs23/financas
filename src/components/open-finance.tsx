@@ -4,8 +4,10 @@
 //
 // A busca é um "serviço" do app inteiro (BuscaNoBancoProvider): o botão
 // Atualizar do topo, o painel de Carteiras e o sino olham o mesmo estado.
-// Atualizar pede aos bancos dados novos, acompanha a busca no GitHub (na fila,
-// rodando, pronta ou com falha) e recarrega a tela quando os dados chegam.
+// Atualizar busca na hora os dados mais novos, acompanha a busca no GitHub (na
+// fila, rodando, pronta ou com falha) e recarrega a tela quando os dados chegam.
+// Quem conversa com os bancos é o Meu Pluggy, sozinho (em geral uma vez por
+// dia): ele não aceita pedido de atualização de fora.
 
 import {
   createContext,
@@ -33,10 +35,19 @@ const SITUACAO = {
 /** O que a tela mostra enquanto a busca anda. */
 const FASES: Record<AndamentoBusca["situacao"], string> = {
   fila: "Na fila do GitHub...",
-  rodando: "Pedindo aos bancos dados novos...",
+  rodando: "Buscando os dados mais novos...",
   pronta: "Gravando...",
   falhou: "A busca falhou.",
 };
+
+/** A vez mais recente em que o Meu Pluggy falou com algum banco. */
+function bancosAtualizadosEm(status: StatusOpenFinance) {
+  const datas = status.conexoes
+    .map((c) => c.atualizadoNoBancoEm)
+    .filter((d): d is string => !!d)
+    .sort();
+  return datas.at(-1) ?? null;
+}
 
 /** "hoje às 13:05", "ontem às 19:00" ou "08/11 às 07:02". */
 export function quando(iso: string) {
@@ -145,7 +156,7 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
       terminar();
       return;
     }
-    avisar("Atualizando com os bancos: leva uns 2 a 4 minutos. Pode continuar usando o app.");
+    avisar("Buscando os dados mais novos: leva uns 2 minutos. Pode continuar usando o app.");
 
     relogio.current = setInterval(async () => {
       // Como anda a busca no GitHub (a desta vez: pedida há pouco).
@@ -173,10 +184,11 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
         setTimeout(() => void recarregar(), 45_000);
         const n = s.importado;
         const novos = n ? n.transacoes + n.compras : 0;
+        const noBanco = bancosAtualizadosEm(s);
         avisar(
           novos
             ? `Pronto: ${novos} ${novos === 1 ? "movimentação nova" : "movimentações novas"} dos bancos.`
-            : "Pronto: os bancos não têm nada novo desde a última busca.",
+            : `Pronto: nada novo.${noBanco ? ` O Meu Pluggy falou com os bancos ${quando(noBanco)}.` : ""}`,
         );
         return;
       }
@@ -202,7 +214,7 @@ export function BotaoAtualizar() {
   if (!disponivel || !status) return null;
   const rotulo = buscando
     ? (fase ?? "Atualizando...")
-    : `Atualizar com os bancos (última busca ${quando(status.buscadoEm)})`;
+    : `Buscar os dados mais novos (última busca ${quando(status.buscadoEm)})`;
   return (
     <BotaoIcone
       icone={RefreshCw}
@@ -233,8 +245,9 @@ export function PainelOpenFinance() {
               <span className="font-medium text-primary-text">{fase}</span>
             ) : (
               <>
-                Última busca {quando(status.buscadoEm)}. O app busca sozinho às 7h, 13h e 19h;
-                &quot;Atualizar&quot; pede aos bancos dados novos na hora.
+                Última busca {quando(status.buscadoEm)}. O app busca sozinho às 7h, 13h e 19h,
+                e &quot;Atualizar&quot; busca na hora. Os bancos passam os dados ao Meu Pluggy
+                sozinhos, em geral uma vez por dia: a hora de cada um está abaixo.
               </>
             )}
           </p>

@@ -253,13 +253,18 @@ roda às 7h, 13h e 19h. Ela pega na Pluggy o que mudou nos últimos 90 dias e
 grava no `financas.json`. A chave secreta da Pluggy fica só nos segredos desse
 repositório, nunca no site.
 
-**Botão Atualizar** (o ícone de setas no topo, ou em Carteiras): pede aos bancos
-dados novos na hora (o mesmo que "atualizar" no Meu Pluggy) e depois busca. Leva
-uns 2 a 4 minutos; o botão gira e mostra o andamento (na fila, pedindo aos
-bancos, gravando) e avisa quando terminar, com quantas movimentações novas
-vieram. Se a busca falhar, Carteiras mostra o link para ver o motivo no GitHub.
-As buscas automáticas só leem o que a Pluggy já tem: ela atualiza os bancos
-sozinha uma vez por dia. Falhas passageiras da Pluggy são tentadas de novo.
+**Botão Atualizar** (o ícone de setas no topo, ou em Carteiras): busca na hora
+os dados mais novos. Leva uns 2 minutos; o botão gira e mostra o andamento (na
+fila, buscando, gravando) e avisa quando terminar, com quantas movimentações
+novas vieram. Se a busca falhar, Carteiras mostra o link para ver o motivo no
+GitHub. Falhas passageiras da Pluggy são tentadas de novo.
+
+Quem conversa com os bancos é o Meu Pluggy, sozinho (em geral uma vez por dia).
+Conexões feitas por ele não aceitam pedido de atualização de fora: a Pluggy
+responde "MeuPluggy item cant be updated". Por isso a busca (automática ou pelo
+botão) pega o que o Meu Pluggy já tem; Carteiras mostra quando cada banco foi
+atualizado. Para forçar um banco na hora, atualize a conexão no próprio
+Meu Pluggy e depois toque em Atualizar.
 
 **O que entra no app:**
 

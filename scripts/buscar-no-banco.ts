@@ -121,22 +121,34 @@ interface ItemPluggy {
 }
 
 /**
- * Pede aos bancos dados novos (o mesmo que "atualizar" no Meu Pluggy) e espera
- * terminar, até 2 minutos e meio. Se o banco não deixar agora, segue com os
- * dados que a Pluggy já tem (ela atualiza sozinha uma vez por dia).
+ * Pede aos bancos dados novos e espera terminar, até 2 minutos e meio. Se o
+ * banco não deixar agora, segue com os dados que a Pluggy já tem.
+ *
+ * Conexões feitas pelo Meu Pluggy não aceitam esse pedido (a Pluggy responde
+ * "MeuPluggy item cant be updated"): o próprio Meu Pluggy atualiza com os
+ * bancos sozinho, e a busca pega o que ele já tem.
  */
 async function atualizarNosBancos(chave: string, itens: string[]) {
+  let doMeuPluggy = 0;
   const pedidos = await Promise.all(
     itens.map(async (item) => {
       try {
         await pluggy(chave, `/items/${item}`, { method: "PATCH", body: {} });
         return true;
       } catch (e) {
-        console.log(`  Atualizar no banco: ${e instanceof Error ? e.message : e}`);
+        const motivo = e instanceof Error ? e.message : String(e);
+        if (/meu ?pluggy/i.test(motivo)) doMeuPluggy++;
+        else console.log(`  Atualizar no banco: ${motivo}`);
         return false;
       }
     }),
   );
+  if (doMeuPluggy)
+    console.log(
+      `Atualização nos bancos: ${doMeuPluggy} conexão(ões) do Meu Pluggy, que atualiza com os ` +
+        "bancos sozinho; a busca pega os dados mais novos que ele já tem.",
+    );
+  if (doMeuPluggy === itens.length) return;
   const pendentes = new Set(itens.filter((_, i) => pedidos[i]));
   const limite = Date.now() + 150_000;
   while (pendentes.size && Date.now() < limite) {
