@@ -144,7 +144,7 @@ export function SaldoPrevisto() {
               href="/renda"
               aria-label="Editar renda"
               title="Editar renda"
-              className="self-center text-ink-3 transition-colors hover:text-ink"
+              className="alvo-toque self-center text-ink-3 transition-colors hover:text-ink"
             >
               <Pencil size={12} />
             </Link>

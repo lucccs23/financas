@@ -149,6 +149,17 @@ describe("resultado, recorrentes e fatura", () => {
       estornos: 0,
     });
   });
+  it("parcela vinda do banco conta como parcela (e de meses anteriores, se não for a primeira)", () => {
+    const doBanco = (id: string, descricao: string, valor: number) => ({
+      ...compras[0], id, descricao, valor, parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null,
+    });
+    const c = composicaoFatura(
+      { id: "k" },
+      [doBanco("a", "Loja · parcela 3/10", R(100)), doBanco("b", "Mercado", R(50)), doBanco("c", "Tênis · parcela 1/5", R(40))],
+      MES,
+    );
+    expect(c).toMatchObject({ parcelas: R(140), avulsas: R(50), novas: R(90), herdadas: R(100), total: R(190) });
+  });
   it("estorno abate o total sem bagunçar a composição", () => {
     const estorno = { ...compras[0], id: "est", descricao: "Estorno", valor: -R(15), parcelas: 1, recorrente: false, mesPrimeira: MES, mesFim: null };
     const c = composicaoFatura({ id: "k" }, [...compras, estorno], MES);

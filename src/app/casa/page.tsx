@@ -122,7 +122,7 @@ export default function PaginaCasa() {
         </Botao>
       </CabecalhoPagina>
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start ultra:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <div className="grid min-w-0 gap-4 sm:gap-6">
           {/* Resumo */}
           <Painel className="p-4 sm:p-6">
@@ -326,7 +326,7 @@ export default function PaginaCasa() {
           </Painel>
         </div>
 
-        <div className="grid min-w-0 gap-4 sm:gap-6 md:max-xl:grid-cols-2">
+        <div className="grid min-w-0 gap-4 sm:gap-6 md:max-xl:grid-cols-2 ultra:grid-cols-2 ultra:items-start">
           {/* Moradores */}
           <Painel className="p-4 sm:p-6">
             <div className="flex items-center justify-between gap-4">
@@ -423,7 +423,7 @@ export default function PaginaCasa() {
             <button
               type="button"
               onClick={sairDaCasa}
-              className="mt-6 flex items-center gap-2 text-[13px]/5 font-medium text-bad-text hover:underline"
+              className="alvo-toque mt-6 flex items-center gap-2 text-[13px]/5 font-medium text-bad-text hover:underline"
             >
               <LogOut size={16} />
               Sair desta casa

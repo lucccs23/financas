@@ -82,7 +82,15 @@ function LinhaDoMes({
         strokeDasharray="4 5"
         vectorEffect="non-scaling-stroke"
       />
-      <line x1={0} y1={A} x2={L} y2={A} stroke="var(--grid)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+      <line
+        x1={0}
+        y1={A}
+        x2={L}
+        y2={A}
+        stroke="var(--grid)"
+        strokeWidth={1}
+        vectorEffect="non-scaling-stroke"
+      />
       {ultimo > 0 && (
         <>
           <polygon
@@ -127,9 +135,20 @@ export function AindaPodeGastar() {
   const perfil = usePerfil();
   const { abrir } = useModais();
   const [indice, setIndice] = useState(0);
-  const ritmo = useMemo(() => ritmoDeGasto(dados, perfil.id, mes, hoje), [dados, perfil.id, mes, hoje]);
+  const ritmo = useMemo(
+    () => ritmoDeGasto(dados, perfil.id, mes, hoje),
+    [dados, perfil.id, mes, hoje],
+  );
   const dicas = useMemo(
-    () => dicasDoMes(dados, perfil.id, mes, hoje, (c) => formatar(c), (c) => categoria(c).nome),
+    () =>
+      dicasDoMes(
+        dados,
+        perfil.id,
+        mes,
+        hoje,
+        (c) => formatar(c),
+        (c) => categoria(c).nome,
+      ),
     [dados, perfil.id, mes, hoje],
   );
   const dica = dicas[Math.min(indice, dicas.length - 1)];
@@ -165,7 +184,9 @@ export function AindaPodeGastar() {
                 centavos={Math.abs(ritmo.restante)}
                 className={cx("text-[34px] leading-none", passou && "!text-bad-text")}
               />
-              <span className="tabular text-sm text-ink-3">/ {formatar(ritmo.orcamento, { semCentavos: true })}</span>
+              <span className="tabular text-sm text-ink-3">
+                / {formatar(ritmo.orcamento, { semCentavos: true })}
+              </span>
             </div>
             <p className="mt-2 text-[13px]/5 text-ink-3">
               {formatar(ritmo.gasto)} gastos no dia a dia
@@ -174,11 +195,19 @@ export function AindaPodeGastar() {
               )}
             </p>
             <div className="mt-4">
-              <LinhaDoMes acumulado={ritmo.acumulado} dias={ritmo.diasNoMes} orcamento={ritmo.orcamento} gasto={ritmo.gasto} />
+              <LinhaDoMes
+                acumulado={ritmo.acumulado}
+                dias={ritmo.diasNoMes}
+                orcamento={ritmo.orcamento}
+                gasto={ritmo.gasto}
+              />
               <div className="mt-1 flex justify-between text-[11px]/4 text-ink-3">
                 <span>1 {mesCurto(mes).toLowerCase()}</span>
                 <span className="flex items-center gap-2">
-                  <span aria-hidden className="inline-block w-4 border-t-[1.5px] border-dashed border-axis" />
+                  <span
+                    aria-hidden
+                    className="inline-block w-4 border-t-[1.5px] border-dashed border-axis"
+                  />
                   ritmo ideal
                 </span>
                 <span>
@@ -213,7 +242,9 @@ export function AindaPodeGastar() {
                   aria-hidden
                   className={cx(
                     "h-2 rounded-full transition-all",
-                    i === Math.min(indice, dicas.length - 1) ? "w-4 bg-primary" : "w-2 bg-line-strong",
+                    i === Math.min(indice, dicas.length - 1)
+                      ? "w-4 bg-primary"
+                      : "w-2 bg-line-strong",
                   )}
                 />
               ))}
@@ -242,13 +273,25 @@ export function DistribuicaoGastos() {
 
   const { fatias, total } = useMemo(() => {
     const lista = gastosPorCategoria(dados, perfil.id, mes);
-    const antes = new Map(gastosPorCategoria(dados, perfil.id, addMes(mes, -1)).map((g) => [g.categoria, g.valor]));
+    const antes = new Map(
+      gastosPorCategoria(dados, perfil.id, addMes(mes, -1)).map((g) => [g.categoria, g.valor]),
+    );
     const principais = lista.slice(0, MAX_FATIAS);
     const resto = lista.slice(MAX_FATIAS).reduce((s, g) => s + g.valor, 0);
-    const restoAntes = lista.slice(MAX_FATIAS).reduce((s, g) => s + (antes.get(g.categoria) ?? 0), 0);
+    const restoAntes = lista
+      .slice(MAX_FATIAS)
+      .reduce((s, g) => s + (antes.get(g.categoria) ?? 0), 0);
     const f = [
-      ...principais.map((g, i) => ({ id: g.categoria, nome: categoria(g.categoria).nome, valor: g.valor, cor: i, antes: antes.get(g.categoria) ?? 0 })),
-      ...(resto > 0 ? [{ id: "_outras", nome: "Outras categorias", valor: resto, cor: -1, antes: restoAntes }] : []),
+      ...principais.map((g, i) => ({
+        id: g.categoria,
+        nome: categoria(g.categoria).nome,
+        valor: g.valor,
+        cor: i,
+        antes: antes.get(g.categoria) ?? 0,
+      })),
+      ...(resto > 0
+        ? [{ id: "_outras", nome: "Outras categorias", valor: resto, cor: -1, antes: restoAntes }]
+        : []),
     ];
     return { fatias: f, total: lista.reduce((s, g) => s + g.valor, 0) };
   }, [dados, perfil.id, mes]);
@@ -273,8 +316,20 @@ export function DistribuicaoGastos() {
       ) : (
         <div className="mt-4 flex flex-1 flex-col items-center gap-6 @md:flex-row @md:items-center">
           <div className="relative h-40 w-40 shrink-0">
-            <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90" role="img" aria-label={fatias.map((f) => `${f.nome} ${porcento(f.valor / total)}`).join(", ")}>
-              <circle cx={70} cy={70} r={R} fill="none" stroke="var(--surface-3)" strokeWidth={18} />
+            <svg
+              viewBox="0 0 140 140"
+              className="h-full w-full -rotate-90"
+              role="img"
+              aria-label={fatias.map((f) => `${f.nome} ${porcento(f.valor / total)}`).join(", ")}
+            >
+              <circle
+                cx={70}
+                cy={70}
+                r={R}
+                fill="none"
+                stroke="var(--surface-3)"
+                strokeWidth={18}
+              />
               {fatias.map((f, indice) => {
                 const comprimento = (f.valor / total) * C;
                 const desenho = Math.max(0.5, comprimento - espaco);
@@ -303,7 +358,11 @@ export function DistribuicaoGastos() {
                 <p className="tabular text-lg font-semibold tracking-[-0.02em] text-ink">
                   {compacto(focada ? focada.valor : total).replace(/^/, "R$ ")}
                 </p>
-                {focada && <p className="tabular text-[11px]/4 text-ink-3">{porcento(focada.valor / total)}</p>}
+                {focada && (
+                  <p className="tabular text-[11px]/4 text-ink-3">
+                    {porcento(focada.valor / total)}
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -324,7 +383,9 @@ export function DistribuicaoGastos() {
                   <Ponto cor={corDe(f.cor)} tamanho={8} />
                   <span className="min-w-0 flex-1 truncate text-ink">{f.nome}</span>
                   <span className="tabular text-xs text-ink-3">{porcento(f.valor / total)}</span>
-                  <span className="tabular w-22 text-right font-semibold text-ink">{formatar(f.valor, { semCentavos: true })}</span>
+                  <span className="tabular w-22 text-right font-semibold text-ink">
+                    {formatar(f.valor, { semCentavos: true })}
+                  </span>
                   <span
                     className="w-4 shrink-0"
                     title={
@@ -335,8 +396,12 @@ export function DistribuicaoGastos() {
                           : undefined
                     }
                   >
-                    {subiu && <TrendingUp size={16} className="text-warn-text" aria-label="subiu" />}
-                    {caiu && <TrendingDown size={16} className="text-good-text" aria-label="caiu" />}
+                    {subiu && (
+                      <TrendingUp size={16} className="text-warn-text" aria-label="subiu" />
+                    )}
+                    {caiu && (
+                      <TrendingDown size={16} className="text-good-text" aria-label="caiu" />
+                    )}
                   </span>
                 </li>
               );
@@ -368,13 +433,21 @@ export function TransacoesRecentes() {
     <Painel className="flex h-full flex-col p-4 sm:p-6">
       <div className="flex items-baseline justify-between gap-4">
         <TituloPainel>Transações recentes</TituloPainel>
-        <Link href="/transacoes" className="text-xs font-medium text-primary-text hover:underline">
+        <Link
+          href="/transacoes"
+          className="alvo-toque text-xs font-medium text-primary-text hover:underline"
+        >
           Ver todas
         </Link>
       </div>
       {recentes.length === 0 ? (
         <div className="grid flex-1 place-items-center">
-          <Vazio compacto icone={Receipt} titulo="Nenhuma transação ainda" texto="Lance um gasto do dia a dia para ele aparecer aqui.">
+          <Vazio
+            compacto
+            icone={Receipt}
+            titulo="Nenhuma transação ainda"
+            texto="Lance um gasto do dia a dia para ele aparecer aqui."
+          >
             <Botao tamanho="sm" variante="primario" onClick={() => abrir({ tipo: "transacao" })}>
               <Plus size={16} />
               Nova transação
@@ -398,11 +471,21 @@ export function TransacoesRecentes() {
                       className="flex w-full items-center gap-4 py-2 text-left"
                     >
                       <Ladrilho
-                        icone={t.tipo === "transferencia" ? ArrowLeftRight : t.tipo === "entrada" ? ArrowDownLeft : c.icone}
+                        icone={
+                          t.tipo === "transferencia"
+                            ? ArrowLeftRight
+                            : t.tipo === "entrada"
+                              ? ArrowDownLeft
+                              : c.icone
+                        }
                         tamanho={32}
-                        className={t.tipo === "entrada" ? "!bg-good-soft !text-good-text" : undefined}
+                        className={
+                          t.tipo === "entrada" ? "!bg-good-soft !text-good-text" : undefined
+                        }
                       />
-                      <span className="min-w-0 flex-1 truncate text-sm text-ink">{t.descricao}</span>
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                        {t.descricao}
+                      </span>
                       <span className="hidden truncate text-xs text-ink-3 @md:block">{c.nome}</span>
                       <span
                         className={cx(
@@ -447,7 +530,10 @@ export function ResultadoMes() {
     <Painel className="flex h-full flex-col p-4 sm:p-6">
       <TituloPainel detalhe={nomeMes(mes).toLowerCase()}>Resultado</TituloPainel>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Valor centavos={r.resultado} className={cx("text-[34px] leading-none", r.resultado < 0 && "!text-bad-text")} />
+        <Valor
+          centavos={r.resultado}
+          className={cx("text-[34px] leading-none", r.resultado < 0 && "!text-bad-text")}
+        />
         {r.variacao !== null && (
           <span
             className={cx(
@@ -469,7 +555,14 @@ export function ResultadoMes() {
           rotulo="Resultado de cada mês"
           altura={120}
           selecionado={mes}
-          series={[{ id: "sobra", rotulo: "Resultado", cor: "var(--seg-sobra)", corNegativa: "var(--bad)" }]}
+          series={[
+            {
+              id: "sobra",
+              rotulo: "Resultado",
+              cor: "var(--seg-sobra)",
+              corNegativa: "var(--bad)",
+            },
+          ]}
           grupos={historico}
         />
       </div>
@@ -479,14 +572,18 @@ export function ResultadoMes() {
             <ArrowDownLeft size={16} className="text-good-text" />
             Entradas
           </p>
-          <p className="tabular text-[15px]/6 font-semibold whitespace-nowrap text-ink @xs:mt-1">{formatar(r.receita)}</p>
+          <p className="tabular text-[15px]/6 font-semibold whitespace-nowrap text-ink @xs:mt-1">
+            {formatar(r.receita)}
+          </p>
         </div>
         <div className="flex items-center justify-between gap-2 rounded-2xl bg-surface-2 px-4 py-2 @xs:block @xs:py-4">
           <p className="flex items-center gap-2 text-xs text-ink-3">
             <ArrowUpRight size={16} className="text-bad-text" />
             Saídas
           </p>
-          <p className="tabular text-[15px]/6 font-semibold whitespace-nowrap text-ink @xs:mt-1">{formatar(r.gasto)}</p>
+          <p className="tabular text-[15px]/6 font-semibold whitespace-nowrap text-ink @xs:mt-1">
+            {formatar(r.gasto)}
+          </p>
         </div>
       </div>
     </Painel>

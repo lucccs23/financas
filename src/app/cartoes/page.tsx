@@ -4,7 +4,14 @@ import { useMemo, useState } from "react";
 import { categoria } from "@/lib/categorias";
 import { CircleCheck, CreditCard, FileUp, Pencil, Plus, Repeat, ShoppingBag } from "lucide-react";
 import { useApp, usePerfil } from "@/lib/app";
-import { comprasDaFatura, faturaDoMes, itensDoMes, limiteDoCartao } from "@/lib/calc";
+import {
+  comprasDaFatura,
+  faturaDoMes,
+  itensDoMes,
+  limiteDoCartao,
+  parcelaDaCompra,
+  semSufixoDeParcela,
+} from "@/lib/calc";
 import { formatar, porcento } from "@/lib/dinheiro";
 import { addMes, dataBR, intervalo, mesEixo, nomeMes } from "@/lib/meses";
 import type { Id } from "@/lib/types";
@@ -136,7 +143,7 @@ export default function PaginaCartoes() {
         })}
       </Carrossel>
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start ultra:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
         <Painel className="p-4 sm:p-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
@@ -233,7 +240,8 @@ export default function PaginaCartoes() {
             <p className="mt-2 text-[13px]/5 text-ink-3">Nada nesta fatura.</p>
           ) : (
             <ul className="mt-1">
-              {linhas.map(({ compra, valor, parcela }) => {
+              {linhas.map(({ compra, valor }) => {
+                const parcela = parcelaDaCompra(compra, mes);
                 const corpo = (
                   <>
                     <Ladrilho
@@ -244,7 +252,7 @@ export default function PaginaCartoes() {
                     />
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-medium text-ink">
-                        {compra.descricao}
+                        {semSufixoDeParcela(compra.descricao)}
                       </span>
                       <span className="block truncate text-xs text-ink-3">
                         {dataBR(compra.data)}
@@ -252,14 +260,14 @@ export default function PaginaCartoes() {
                           ? " · estorno"
                           : compra.recorrente
                             ? " · assinatura"
-                            : parcela
+                            : parcela && !parcela.doBanco
                               ? ` · total ${formatar(compra.valor)}`
                               : ""}
                       </span>
                     </span>
                     {parcela && (
                       <Etiqueta>
-                        {parcela}/{compra.parcelas}
+                        {parcela.numero}/{parcela.total}
                       </Etiqueta>
                     )}
                     <span

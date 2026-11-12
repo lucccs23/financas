@@ -59,7 +59,10 @@ export default function PaginaCarteiras() {
         <button
           type="button"
           onClick={() => abrir({ tipo: "carteira", carteira: c })}
-          className={cx("flex w-full items-center gap-4 py-4 text-left", c.arquivada && "opacity-60")}
+          className={cx(
+            "flex w-full items-center gap-4 py-4 text-left",
+            c.arquivada && "opacity-60",
+          )}
         >
           <span
             className="grid h-10 w-10 shrink-0 place-items-center rounded-lg text-white"
@@ -74,7 +77,12 @@ export default function PaginaCarteiras() {
               {data ? ` · última movimentação ${dataBR(data)}` : " · sem movimentação"}
             </span>
           </span>
-          <span className={cx("tabular text-[15px]/6 font-semibold whitespace-nowrap", saldo < 0 ? "text-bad-text" : "text-ink")}>
+          <span
+            className={cx(
+              "tabular text-[15px]/6 font-semibold whitespace-nowrap",
+              saldo < 0 ? "text-bad-text" : "text-ink",
+            )}
+          >
             {formatar(saldo)}
           </span>
         </button>
@@ -84,7 +92,10 @@ export default function PaginaCarteiras() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <CabecalhoPagina titulo="Carteiras" texto="Onde o seu dinheiro está e quanto você tem de fato.">
+      <CabecalhoPagina
+        titulo="Carteiras"
+        texto="Onde o seu dinheiro está e quanto você tem de fato."
+      >
         {ativas.length >= 2 && (
           <Botao onClick={() => abrir({ tipo: "transacao", tipoTransacao: "transferencia" })}>
             <ArrowLeftRight size={16} />
@@ -99,14 +110,19 @@ export default function PaginaCarteiras() {
 
       <PainelOpenFinance />
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
-        <div className="grid min-w-0 gap-4 sm:gap-6">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start ultra:grid-cols-3">
+        <div className="grid min-w-0 gap-4 sm:gap-6 ultra:contents">
           <Painel className="p-4 sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <TituloPainel>Patrimônio</TituloPainel>
-                <p className="mt-4 text-[13px]/5 text-ink-3">O que você tem, menos o que ainda deve no cartão</p>
-                <Valor centavos={p.total} className={cx("mt-1 text-[40px] leading-none", p.total < 0 && "!text-bad-text")} />
+                <p className="mt-4 text-[13px]/5 text-ink-3">
+                  O que você tem, menos o que ainda deve no cartão
+                </p>
+                <Valor
+                  centavos={p.total}
+                  className={cx("mt-1 text-[40px] leading-none", p.total < 0 && "!text-bad-text")}
+                />
               </div>
               <Ilustracao painel="reserva" icone={Landmark} tom="verde" tamanho={72} />
             </div>
@@ -114,7 +130,12 @@ export default function PaginaCarteiras() {
               {[
                 { rotulo: "Nas carteiras", valor: p.carteiras, icone: Wallet, sinal: "" },
                 { rotulo: "Guardado na reserva", valor: p.reserva, icone: PiggyBank, sinal: "+ " },
-                { rotulo: "A pagar nos cartões", valor: p.dividaCartoes, icone: CreditCard, sinal: "− " },
+                {
+                  rotulo: "A pagar nos cartões",
+                  valor: p.dividaCartoes,
+                  icone: CreditCard,
+                  sinal: "− ",
+                },
               ].map((x) => (
                 <li key={x.rotulo} className="rounded-2xl bg-surface-2 p-4">
                   <p className="flex items-center gap-2 text-xs text-ink-3">
@@ -129,14 +150,17 @@ export default function PaginaCarteiras() {
               ))}
             </ul>
             <p className="mt-4 text-xs leading-5 text-ink-3">
-              &quot;A pagar nos cartões&quot; soma as parcelas e faturas ainda não pagas, deste mês em diante.
+              &quot;A pagar nos cartões&quot; soma as parcelas e faturas ainda não pagas, deste mês
+              em diante.
             </p>
           </Painel>
 
           <Painel className="px-4 py-4 sm:px-6">
             <div className="flex items-baseline justify-between gap-4 pt-2">
               <TituloPainel>Saldo nas carteiras</TituloPainel>
-              <span className="tabular text-sm font-semibold text-ink">{formatar(p.carteiras)}</span>
+              <span className="tabular text-sm font-semibold text-ink">
+                {formatar(p.carteiras)}
+              </span>
             </div>
             {ativas.length === 0 ? (
               <Vazio
@@ -169,7 +193,9 @@ export default function PaginaCarteiras() {
 
         <Painel className="p-4 sm:p-6">
           <TituloPainel>Evolução do saldo</TituloPainel>
-          <p className="mt-1 mb-6 text-[13px]/5 text-ink-3">Saldo das carteiras no fim de cada mês.</p>
+          <p className="mt-1 mb-6 text-[13px]/5 text-ink-3">
+            Saldo das carteiras no fim de cada mês.
+          </p>
           {ativas.length === 0 ? (
             <p className="text-[13px]/5 text-ink-3">Aparece quando houver carteiras.</p>
           ) : (
@@ -177,7 +203,14 @@ export default function PaginaCarteiras() {
               rotulo="Saldo das carteiras no fim de cada mês"
               altura={200}
               selecionado={mesHoje}
-              series={[{ id: "saldo", rotulo: "Saldo", cor: "var(--seg-sobra)", corNegativa: "var(--bad)" }]}
+              series={[
+                {
+                  id: "saldo",
+                  rotulo: "Saldo",
+                  cor: "var(--seg-sobra)",
+                  corNegativa: "var(--bad)",
+                },
+              ]}
               grupos={evolucao}
             />
           )}

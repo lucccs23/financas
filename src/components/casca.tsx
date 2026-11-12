@@ -107,7 +107,7 @@ function Estrutura({ children }: { children: ReactNode }) {
   const setGaveta = (aberta: boolean) => setGavetaEm(aberta ? caminho : null);
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6">
+    <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6 ultra:max-w-[3040px] ultra:px-8">
       <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
         <BarraLateral />
       </aside>
@@ -222,11 +222,7 @@ function BarraLateral() {
           <Palette size={16} className="text-ink-3" />
           Aparência
         </button>
-        <div
-          role="radiogroup"
-          aria-label="Tema"
-          className="flex rounded-full bg-surface-2 p-1"
-        >
+        <div role="radiogroup" aria-label="Tema" className="flex rounded-full bg-surface-2 p-1">
           {(
             [
               ["claro", Sun, "Claro"],
@@ -392,7 +388,9 @@ function Sino() {
         <div className="absolute top-[calc(100%+8px)] right-0 z-40 w-88 animate-subir rounded-2xl border border-line bg-surface shadow-pop max-sm:fixed max-sm:inset-x-4 max-sm:top-20 max-sm:w-auto">
           <div className="border-b border-line px-4 py-4">
             <p className="text-sm font-semibold text-ink">Vencimentos</p>
-            <p className="text-xs text-ink-3">Contas que você paga, atrasadas ou dos próximos 5 dias.</p>
+            <p className="text-xs text-ink-3">
+              Contas que você paga, atrasadas ou dos próximos 5 dias.
+            </p>
           </div>
           {lista.length === 0 ? (
             <div className="flex items-center gap-4 px-4 py-6">
@@ -418,7 +416,11 @@ function Sino() {
                     <span
                       className={cx(
                         "flex items-center gap-1 text-xs",
-                        a.dias < 0 ? "text-bad-text" : a.dias === 0 ? "text-warn-text" : "text-ink-3",
+                        a.dias < 0
+                          ? "text-bad-text"
+                          : a.dias === 0
+                            ? "text-warn-text"
+                            : "text-ink-3",
                       )}
                     >
                       {a.dias <= 0 && <TriangleAlert size={12} />}
@@ -462,7 +464,9 @@ function BotaoBusca() {
       >
         <Search size={16} />
         <span className="max-md:hidden">Buscar</span>
-        <kbd className="ml-4 rounded border border-line bg-surface-2 px-1 text-[11px]/4 max-md:hidden">Ctrl K</kbd>
+        <kbd className="ml-4 rounded border border-line bg-surface-2 px-1 text-[11px]/4 max-md:hidden">
+          Ctrl K
+        </kbd>
       </button>
       {aberta && <Busca onFechar={() => setAberta(false)} />}
     </>

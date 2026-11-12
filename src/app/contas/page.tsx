@@ -25,7 +25,15 @@ import {
 
 type Filtro = "todas" | "minhas" | "casa";
 
-function Indicador({ rotulo, valor, detalhe }: { rotulo: string; valor: number; detalhe?: string }) {
+function Indicador({
+  rotulo,
+  valor,
+  detalhe,
+}: {
+  rotulo: string;
+  valor: number;
+  detalhe?: string;
+}) {
   return (
     <Painel className="p-6">
       <p className="text-[13px]/5 text-ink-3">{rotulo}</p>
@@ -67,12 +75,16 @@ export default function PaginaContas() {
     .filter((p) => cabe(p.conta.larId ? "casa" : "pessoal"));
 
   // Contas que já acabaram antes do mês aberto ficam separadas no cadastro.
-  const encerrada = (c: Conta) => (c.recorrente ? c.mesFim !== null && c.mesFim < mes : c.mesInicio < mes);
+  const encerrada = (c: Conta) =>
+    c.recorrente ? c.mesFim !== null && c.mesFim < mes : c.mesInicio < mes;
   const todasDoFiltro = dados.contas.filter((c) => cabe(c.larId ? "casa" : "pessoal"));
   const encerradas = todasDoFiltro.filter(encerrada);
   const cadastro = todasDoFiltro.filter((c) => !encerrada(c));
   const grupos = [
-    { titulo: "Contas minhas", contas: cadastro.filter((c) => !c.larId && c.natureza === "despesa") },
+    {
+      titulo: "Contas minhas",
+      contas: cadastro.filter((c) => !c.larId && c.natureza === "despesa"),
+    },
     { titulo: "Contas da casa", contas: cadastro.filter((c) => !!c.larId) },
     { titulo: "Rendas", contas: cadastro.filter((c) => c.natureza === "receita") },
   ].filter((g) => g.contas.length);
@@ -195,7 +207,7 @@ export default function PaginaContas() {
             </Vazio>
           </Painel>
         ) : (
-          <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start">
+          <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-start ultra:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
             <Painel className="px-4 py-4 sm:px-6">
               <p className="pt-2 pb-1 text-xs font-semibold text-ink">Despesas</p>
               {despesas.length ? (
@@ -219,7 +231,9 @@ export default function PaginaContas() {
                           variante="fantasma"
                           onClick={async () => {
                             await atualizar("lancamentos", lancamento.id, { pulado: false });
-                            avisar(`"${conta.nome}" voltou a contar em ${nomeMes(mes).toLowerCase()}.`);
+                            avisar(
+                              `"${conta.nome}" voltou a contar em ${nomeMes(mes).toLowerCase()}.`,
+                            );
                           }}
                         >
                           Voltar a contar
@@ -261,7 +275,9 @@ export default function PaginaContas() {
                     >
                       <Ladrilho icone={categoria(c.categoria).icone} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-ink">{c.nome}</span>
+                        <span className="block truncate text-sm font-medium text-ink">
+                          {c.nome}
+                        </span>
                         <span className="block truncate text-xs text-ink-3">{repeticao(c)}</span>
                       </span>
                       <span className="tabular text-sm font-semibold whitespace-nowrap text-ink">
@@ -301,7 +317,9 @@ export default function PaginaContas() {
                       >
                         <Ladrilho icone={categoria(c.categoria).icone} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-ink">{c.nome}</span>
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {c.nome}
+                          </span>
                           <span className="block truncate text-xs text-ink-3">{repeticao(c)}</span>
                         </span>
                         <span className="tabular text-sm font-semibold whitespace-nowrap text-ink-2">

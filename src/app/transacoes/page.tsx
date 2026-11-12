@@ -75,11 +75,17 @@ export default function PaginaTransacoes() {
 
   // "Só saldo" (fatura paga, dinheiro entre contas suas...) aparece no extrato, mas
   // não soma como gasto nem como entrada.
-  const entradas = filtradas.filter((t) => t.tipo === "entrada" && !t.soSaldo).reduce((s, t) => s + t.valor, 0);
-  const saidas = filtradas.filter((t) => t.tipo === "saida" && !t.soSaldo).reduce((s, t) => s + t.valor, 0);
+  const entradas = filtradas
+    .filter((t) => t.tipo === "entrada" && !t.soSaldo)
+    .reduce((s, t) => s + t.valor, 0);
+  const saidas = filtradas
+    .filter((t) => t.tipo === "saida" && !t.soSaldo)
+    .reduce((s, t) => s + t.valor, 0);
   const meses = Array.from({ length: 7 }, (_, i) => addMes(mes, i - 5));
   const saidasDo = (m: string) =>
-    minhas.filter((t) => t.tipo === "saida" && !t.soSaldo && t.data.slice(0, 7) === m).reduce((s, t) => s + t.valor, 0);
+    minhas
+      .filter((t) => t.tipo === "saida" && !t.soSaldo && t.data.slice(0, 7) === m)
+      .reduce((s, t) => s + t.valor, 0);
   const maiorMes = Math.max(1, ...meses.map(saidasDo));
   const categoriasUsadas = [...new Set(doMes.map((t) => t.categoria))];
   const carteiraNome = (id: string | null) => dados.carteiras.find((c) => c.id === id)?.nome;
@@ -87,7 +93,8 @@ export default function PaginaTransacoes() {
 
   const mapaCategorias = new Map<string, number>();
   for (const t of filtradas) {
-    if (t.tipo === "saida" && !t.soSaldo) mapaCategorias.set(t.categoria, (mapaCategorias.get(t.categoria) ?? 0) + t.valor);
+    if (t.tipo === "saida" && !t.soSaldo)
+      mapaCategorias.set(t.categoria, (mapaCategorias.get(t.categoria) ?? 0) + t.valor);
   }
   const porCategoria = [...mapaCategorias]
     .map(([c, v]) => ({ categoria: c, valor: v }))
@@ -105,7 +112,7 @@ export default function PaginaTransacoes() {
             aspas(t.descricao),
             aspas(categoria(t.categoria).nome),
             t.tipo === "saida" ? "Saída" : t.tipo === "entrada" ? "Entrada" : "Transferência",
-            ((sinal(t) || 1) * t.valor / 100).toFixed(2).replace(".", ","),
+            (((sinal(t) || 1) * t.valor) / 100).toFixed(2).replace(".", ","),
             aspas(carteiraNome(t.carteiraId) ?? ""),
             aspas(t.observacao),
           ].join(";"),
@@ -137,7 +144,11 @@ export default function PaginaTransacoes() {
       </CabecalhoPagina>
 
       {/* Meses: barra com o total de saídas de cada um */}
-      <div role="radiogroup" aria-label="Mês" className="sem-rolagem -mx-1 flex gap-2 overflow-x-auto px-1 py-1">
+      <div
+        role="radiogroup"
+        aria-label="Mês"
+        className="sem-rolagem -mx-1 flex gap-2 overflow-x-auto px-1 py-1"
+      >
         {meses.map((m) => {
           const ativo = m === mes;
           const v = saidasDo(m);
@@ -150,20 +161,31 @@ export default function PaginaTransacoes() {
               onClick={() => setMes(m)}
               className={cx(
                 "flex min-w-[96px] flex-1 flex-col items-center gap-2 rounded-2xl border px-4 py-2 transition-colors",
-                ativo ? "border-primary bg-primary-soft/70" : "border-line bg-surface hover:bg-surface-2",
+                ativo
+                  ? "border-primary bg-primary-soft/70"
+                  : "border-line bg-surface hover:bg-surface-2",
               )}
             >
-              <span className={cx("text-xs", ativo ? "font-semibold text-ink" : "text-ink-3")}>{mesEixo(m)}</span>
+              <span className={cx("text-xs", ativo ? "font-semibold text-ink" : "text-ink-3")}>
+                {mesEixo(m)}
+              </span>
               <span aria-hidden className="flex h-8 w-full items-end justify-center">
                 <span
                   className="w-6 rounded-t-[4px]"
                   style={{
                     height: `${Math.max(v > 0 ? 10 : 4, (v / maiorMes) * 100)}%`,
-                    background: v > 0 ? (ativo ? "var(--seg-pessoal)" : "var(--seg-dia)") : "var(--line-strong)",
+                    background:
+                      v > 0
+                        ? ativo
+                          ? "var(--seg-pessoal)"
+                          : "var(--seg-dia)"
+                        : "var(--line-strong)",
                   }}
                 />
               </span>
-              <span className="tabular text-xs font-semibold text-ink">{formatar(v, { semCentavos: true })}</span>
+              <span className="tabular text-xs font-semibold text-ink">
+                {formatar(v, { semCentavos: true })}
+              </span>
             </button>
           );
         })}
@@ -172,7 +194,10 @@ export default function PaginaTransacoes() {
       <Painel className="p-4 sm:p-6">
         <div className="flex flex-wrap items-center gap-2">
           <label className="relative min-w-[200px] flex-1">
-            <Search size={16} className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-ink-3" />
+            <Search
+              size={16}
+              className="pointer-events-none absolute top-1/2 left-4 -translate-y-1/2 text-ink-3"
+            />
             <input
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
@@ -193,7 +218,12 @@ export default function PaginaTransacoes() {
             ]}
           />
           <div className="w-42">
-            <Selecao aria-label="Categoria" value={cat} onChange={(e) => setCat(e.target.value)} className="!h-10">
+            <Selecao
+              aria-label="Categoria"
+              value={cat}
+              onChange={(e) => setCat(e.target.value)}
+              className="!h-10"
+            >
               <option value="">Todas as categorias</option>
               {categoriasUsadas.map((c) => (
                 <option key={c} value={c}>
@@ -204,7 +234,12 @@ export default function PaginaTransacoes() {
           </div>
           {dados.carteiras.length > 0 && (
             <div className="w-42">
-              <Selecao aria-label="Carteira" value={carteiraId} onChange={(e) => setCarteiraId(e.target.value)} className="!h-10">
+              <Selecao
+                aria-label="Carteira"
+                value={carteiraId}
+                onChange={(e) => setCarteiraId(e.target.value)}
+                className="!h-10"
+              >
                 <option value="">Todas as carteiras</option>
                 {dados.carteiras.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -249,8 +284,16 @@ export default function PaginaTransacoes() {
             <span className="flex items-center gap-1 text-ink-2">
               <ArrowUpRight size={16} /> {formatar(saidas)}
             </span>
-            <span className="font-semibold text-ink">saldo {formatar(entradas - saidas, { sinal: true })}</span>
-            <Botao tamanho="sm" variante="fantasma" onClick={exportar} disabled={!filtradas.length} title="Baixar estas transações em CSV">
+            <span className="font-semibold text-ink">
+              saldo {formatar(entradas - saidas, { sinal: true })}
+            </span>
+            <Botao
+              tamanho="sm"
+              variante="fantasma"
+              onClick={exportar}
+              disabled={!filtradas.length}
+              title="Baixar estas transações em CSV"
+            >
               <Download size={16} />
               Exportar
             </Botao>
@@ -260,7 +303,11 @@ export default function PaginaTransacoes() {
         {filtradas.length === 0 ? (
           <Vazio
             icone={Receipt}
-            titulo={temFiltro ? "Nada com esses filtros" : `Nenhuma transação em ${nomeMes(mes).toLowerCase()}`}
+            titulo={
+              temFiltro
+                ? "Nada com esses filtros"
+                : `Nenhuma transação em ${nomeMes(mes).toLowerCase()}`
+            }
             texto={
               temFiltro
                 ? "Tente limpar a busca ou os filtros."
@@ -294,14 +341,20 @@ export default function PaginaTransacoes() {
                           <Ladrilho
                             icone={t.tipo === "transferencia" ? ArrowLeftRight : c.icone}
                             tamanho={32}
-                            className={t.tipo === "entrada" ? "!bg-good-soft !text-good-text" : undefined}
+                            className={
+                              t.tipo === "entrada" ? "!bg-good-soft !text-good-text" : undefined
+                            }
                           />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-medium text-ink">{t.descricao}</span>
+                            <span className="block truncate text-sm font-medium text-ink">
+                              {t.descricao}
+                            </span>
                             <span className="block truncate text-xs text-ink-3">
                               {t.tipo === "transferencia"
                                 ? `${carteiraNome(t.carteiraId) ?? "?"} → ${carteiraNome(t.carteiraDestinoId) ?? "?"}`
-                                : [c.nome, carteiraNome(t.carteiraId), t.soSaldo && "só saldo"].filter(Boolean).join(" · ")}
+                                : [c.nome, carteiraNome(t.carteiraId), t.soSaldo && "só saldo"]
+                                    .filter(Boolean)
+                                    .join(" · ")}
                             </span>
                           </span>
                           <span
@@ -326,9 +379,11 @@ export default function PaginaTransacoes() {
             ))}
           </div>
         ) : porCategoria.length === 0 ? (
-          <p className="py-8 text-center text-[13px]/5 text-ink-3">Nenhuma saída com esses filtros.</p>
+          <p className="py-8 text-center text-[13px]/5 text-ink-3">
+            Nenhuma saída com esses filtros.
+          </p>
         ) : (
-          <ul className="mt-4 grid gap-x-10 gap-y-1 lg:grid-cols-2">
+          <ul className="mt-4 grid gap-x-10 gap-y-1 lg:grid-cols-2 ultra:grid-cols-3">
             {porCategoria.map((g) => {
               const c = categoria(g.categoria);
               return (
@@ -345,15 +400,22 @@ export default function PaginaTransacoes() {
                     <span className="min-w-0 flex-1">
                       <span className="flex items-baseline justify-between gap-4">
                         <span className="truncate text-sm font-medium text-ink">{c.nome}</span>
-                        <span className="tabular text-sm font-semibold text-ink">{formatar(g.valor)}</span>
+                        <span className="tabular text-sm font-semibold text-ink">
+                          {formatar(g.valor)}
+                        </span>
                       </span>
                       <span className="mt-2 block h-2 overflow-hidden rounded-full bg-surface-3">
                         <span
                           className="block h-full rounded-full"
-                          style={{ width: `${(g.valor / porCategoria[0].valor) * 100}%`, background: "var(--seg-pessoal)" }}
+                          style={{
+                            width: `${(g.valor / porCategoria[0].valor) * 100}%`,
+                            background: "var(--seg-pessoal)",
+                          }}
                         />
                       </span>
-                      <span className="tabular mt-1 block text-[11px]/4 text-ink-3">{porcento(g.valor / saidas)} das saídas</span>
+                      <span className="tabular mt-1 block text-[11px]/4 text-ink-3">
+                        {porcento(g.valor / saidas)} das saídas
+                      </span>
                     </span>
                   </button>
                 </li>

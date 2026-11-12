@@ -35,9 +35,7 @@ export function ocorreNoMes(
 /** Quanto desta compra cai na fatura do mês. Os centavos que sobram da divisão vão nas primeiras parcelas. */
 export function valorParcela(compra: Compra, mes: Mes): number {
   if (compra.recorrente) {
-    const ativa =
-      mes >= compra.mesPrimeira &&
-      (compra.mesFim === null || mes <= compra.mesFim);
+    const ativa = mes >= compra.mesPrimeira && (compra.mesFim === null || mes <= compra.mesFim);
     return ativa ? compra.valor : 0;
   }
   const n = Math.max(1, compra.parcelas);
@@ -55,10 +53,28 @@ export function numeroParcela(compra: Compra, mes: Mes): number | null {
   return i >= 0 && i < compra.parcelas ? i + 1 : null;
 }
 
+/** Sufixo que a busca no banco põe nas parcelas: "Loja · parcela 3/10". */
+const SUFIXO_PARCELA = / · parcela (\d+)\/(\d+)$/;
+
+/**
+ * Parcela de uma compra naquele mês, seja calculada aqui (compra parcelada
+ * lançada no app) ou informada pelo banco (cada parcela é um lançamento).
+ */
+export function parcelaDaCompra(
+  compra: Compra,
+  mes: Mes,
+): { numero: number; total: number; doBanco: boolean } | null {
+  const m = compra.parcelas <= 1 ? compra.descricao.match(SUFIXO_PARCELA) : null;
+  if (m) return { numero: Number(m[1]), total: Number(m[2]), doBanco: true };
+  const numero = numeroParcela(compra, mes);
+  return numero ? { numero, total: compra.parcelas, doBanco: false } : null;
+}
+
+/** Descrição sem o sufixo de parcela que a busca no banco acrescenta. */
+export const semSufixoDeParcela = (descricao: string) => descricao.replace(SUFIXO_PARCELA, "");
+
 export function faturaDoMes(cartaoId: Id, compras: Compra[], mes: Mes): number {
-  return soma(
-    compras.filter((c) => c.cartaoId === cartaoId).map((c) => valorParcela(c, mes)),
-  );
+  return soma(compras.filter((c) => c.cartaoId === cartaoId).map((c) => valorParcela(c, mes)));
 }
 
 export interface LinhaFatura {
@@ -67,21 +83,19 @@ export interface LinhaFatura {
   parcela: number | null;
 }
 
-export function comprasDaFatura(
-  cartaoId: Id,
-  compras: Compra[],
-  mes: Mes,
-): LinhaFatura[] {
-  return compras
-    .filter((c) => c.cartaoId === cartaoId)
-    .map((compra) => ({
-      compra,
-      valor: valorParcela(compra, mes),
-      parcela: numeroParcela(compra, mes),
-    }))
-    // Estornos (valor negativo) também aparecem: abatem a fatura.
-    .filter((l) => l.valor !== 0)
-    .sort((a, b) => b.compra.data.localeCompare(a.compra.data));
+export function comprasDaFatura(cartaoId: Id, compras: Compra[], mes: Mes): LinhaFatura[] {
+  return (
+    compras
+      .filter((c) => c.cartaoId === cartaoId)
+      .map((compra) => ({
+        compra,
+        valor: valorParcela(compra, mes),
+        parcela: numeroParcela(compra, mes),
+      }))
+      // Estornos (valor negativo) também aparecem: abatem a fatura.
+      .filter((l) => l.valor !== 0)
+      .sort((a, b) => b.compra.data.localeCompare(a.compra.data))
+  );
 }
 
 /**
@@ -102,18 +116,11 @@ export function mesPrimeiraFatura(
 
 /* ───────────────────────── Itens do mês ───────────────────────── */
 
-export const chaveLancamento = (
-  refTipo: Lancamento["refTipo"],
-  refId: Id,
-  mes: Mes,
-) => `${refTipo}:${refId}:${mes}`;
+export const chaveLancamento = (refTipo: Lancamento["refTipo"], refId: Id, mes: Mes) =>
+  `${refTipo}:${refId}:${mes}`;
 
-export function indexarLancamentos(
-  lancamentos: Lancamento[],
-): Map<string, Lancamento> {
-  return new Map(
-    lancamentos.map((l) => [chaveLancamento(l.refTipo, l.refId, l.mes), l]),
-  );
+export function indexarLancamentos(lancamentos: Lancamento[]): Map<string, Lancamento> {
+  return new Map(lancamentos.map((l) => [chaveLancamento(l.refTipo, l.refId, l.mes), l]));
 }
 
 /** Uma conta ou fatura já resolvida para um mês: valor final, vencimento e situação. */
@@ -196,11 +203,7 @@ export function itensDoMes(dados: Dados, mes: Mes): ItemMes[] {
 }
 
 /** A pessoa é quem tira o dinheiro do bolso para pagar este item? */
-export function souPagador(
-  item: ItemMes,
-  perfilId: Id,
-  meuMoradorId: Id | null,
-): boolean {
+export function souPagador(item: ItemMes, perfilId: Id, meuMoradorId: Id | null): boolean {
   return item.escopo === "pessoal"
     ? item.perfilId === perfilId
     : item.pagadorId !== null && item.pagadorId === meuMoradorId;
@@ -223,9 +226,7 @@ export function dividir(valor: number, pesos: [Id, number][]): Record<Id, number
     return { id, base, fracao: exato - base, ordem };
   });
   let resto = valor - soma(linhas.map((l) => l.base));
-  const fila = [...linhas].sort(
-    (a, b) => b.fracao - a.fracao || a.ordem - b.ordem,
-  );
+  const fila = [...linhas].sort((a, b) => b.fracao - a.fracao || a.ordem - b.ordem);
   for (const l of fila) {
     if (resto <= 0) break;
     l.base += 1;
@@ -246,9 +247,7 @@ export function pesosDoItem(
       .filter(([id, p]) => existentes.has(id) && p > 0);
     if (proprios.length) return proprios;
   }
-  const padrao = moradores
-    .filter((m) => m.peso > 0)
-    .map((m): [Id, number] => [m.id, m.peso]);
+  const padrao = moradores.filter((m) => m.peso > 0).map((m): [Id, number] => [m.id, m.peso]);
   if (padrao.length) return padrao;
   return moradores.map((m): [Id, number] => [m.id, 1]);
 }
@@ -373,9 +372,7 @@ export function rendaNoMes(
   mes: Mes,
 ): { salario: number; diaADia: number } {
   if (!perfil) return { salario: 0, diaADia: 0 };
-  const historico = [...(perfil.historico ?? [])].sort((a, b) =>
-    a.desde.localeCompare(b.desde),
-  );
+  const historico = [...(perfil.historico ?? [])].sort((a, b) => a.desde.localeCompare(b.desde));
   if (!historico.length) {
     return { salario: perfil.salario, diaADia: perfil.orcamentoDiaADia };
   }
@@ -399,10 +396,9 @@ export function registrarRenda(
   const base: MudancaRenda[] = atual.length
     ? atual
     : [{ desde: "0000-01", salario: perfil.salario, diaADia: perfil.orcamentoDiaADia }];
-  return [
-    ...base.filter((h) => h.desde < desde),
-    { desde, salario, diaADia },
-  ].sort((a, b) => a.desde.localeCompare(b.desde));
+  return [...base.filter((h) => h.desde < desde), { desde, salario, diaADia }].sort((a, b) =>
+    a.desde.localeCompare(b.desde),
+  );
 }
 
 /* ───────────────────────── Gastos avulsos ───────────────────────── */
@@ -456,14 +452,9 @@ export function resumoPessoal(dados: Dados, perfilId: Id, mes: Mes): ResumoPesso
   const casa = eu ? resumoCasa(dados, mes) : null;
 
   const itensPessoais = itens.filter(
-    (i) =>
-      i.escopo === "pessoal" &&
-      i.natureza === "despesa" &&
-      i.perfilId === perfilId,
+    (i) => i.escopo === "pessoal" && i.natureza === "despesa" && i.perfilId === perfilId,
   );
-  const receitas = itens.filter(
-    (i) => i.natureza === "receita" && i.perfilId === perfilId,
-  );
+  const receitas = itens.filter((i) => i.natureza === "receita" && i.perfilId === perfilId);
 
   const { salario, diaADia: orcamentoDiaADia } = rendaNoMes(perfil, mes);
   const avulsas = movimentoAvulso(dados.transacoes ?? [], perfilId, mes);
@@ -566,7 +557,10 @@ export function gastosPorCategoria(dados: Dados, perfilId: Id, mes: Mes): GastoC
   // reserva do dia a dia aparece como "dia-a-dia", para a soma bater com as saídas.
   const avulsas = movimentoAvulso(dados.transacoes ?? [], perfilId, mes);
   for (const [cat, valor] of Object.entries(avulsas.porCategoria)) somar(cat, valor);
-  const reserva = rendaNoMes(dados.perfis.find((p) => p.id === perfilId), mes).diaADia;
+  const reserva = rendaNoMes(
+    dados.perfis.find((p) => p.id === perfilId),
+    mes,
+  ).diaADia;
   somar("dia-a-dia", Math.max(0, reserva - avulsas.saidas));
 
   return [...totais]
@@ -595,15 +589,12 @@ export function resumoMoradia(
   const perfil = dados.perfis.find((p) => p.id === perfilId);
   const eu = dados.moradores.find((m) => m.perfilId === perfilId);
   const casa = resumoCasa(dados, mes);
-  const compartilham = dados.moradores.filter(
-    (m) => m.salarioCompartilhado !== null,
-  ).length;
+  const compartilham = dados.moradores.filter((m) => m.salarioCompartilhado !== null).length;
   const itens: ResumoMoradia["itens"] = [];
 
   for (const linha of casa?.linhas ?? []) {
     if (!linha.item.moradia) continue;
-    const valor =
-      base === "casa" ? linha.item.valor : eu ? (linha.partes[eu.id] ?? 0) : 0;
+    const valor = base === "casa" ? linha.item.valor : eu ? (linha.partes[eu.id] ?? 0) : 0;
     if (valor <= 0) continue;
     itens.push({
       nome: linha.item.nome,
@@ -616,10 +607,7 @@ export function resumoMoradia(
   if (base === "meu") {
     for (const i of itensDoMes(dados, mes)) {
       const minha =
-        i.escopo === "pessoal" &&
-        i.natureza === "despesa" &&
-        i.moradia &&
-        i.perfilId === perfilId;
+        i.escopo === "pessoal" && i.natureza === "despesa" && i.moradia && i.perfilId === perfilId;
       if (!minha) continue;
       itens.push({
         nome: i.nome,
@@ -712,21 +700,13 @@ export interface Alerta {
 }
 
 /** Contas que a pessoa paga, ainda abertas, vencidas ou vencendo em até `janela` dias. */
-export function alertas(
-  dados: Dados,
-  perfilId: Id,
-  hoje: string,
-  janela = 5,
-): Alerta[] {
+export function alertas(dados: Dados, perfilId: Id, hoje: string, janela = 5): Alerta[] {
   const mes = hoje.slice(0, 7);
   const dia = Number(hoje.slice(8, 10));
   const eu = dados.moradores.find((m) => m.perfilId === perfilId);
   const abertas = (m: Mes) =>
     itensDoMes(dados, m).filter(
-      (i) =>
-        i.natureza === "despesa" &&
-        !i.pago &&
-        souPagador(i, perfilId, eu?.id ?? null),
+      (i) => i.natureza === "despesa" && !i.pago && souPagador(i, perfilId, eu?.id ?? null),
     );
 
   const lista: Alerta[] = [];
@@ -744,7 +724,5 @@ export function alertas(
 /* ───────────────────────── Reserva ───────────────────────── */
 
 export function saldoDaMeta(meta: Meta, dados: Pick<Dados, "aportes">): number {
-  return soma(
-    dados.aportes.filter((a) => a.metaId === meta.id).map((a) => a.valor),
-  );
+  return soma(dados.aportes.filter((a) => a.metaId === meta.id).map((a) => a.valor));
 }

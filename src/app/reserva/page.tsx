@@ -126,7 +126,7 @@ function CartaoMeta({ meta }: { meta: Meta }) {
         <button
           type="button"
           onClick={() => setTudo((v) => !v)}
-          className="mt-2 self-start text-xs font-medium text-primary-text hover:underline"
+          className="alvo-toque mt-2 self-start text-xs font-medium text-primary-text hover:underline"
         >
           {tudo ? "Mostrar menos" : `Ver todas as ${movimentos.length}`}
         </button>
@@ -189,7 +189,7 @@ export default function PaginaReserva() {
             <Emblema icone={PiggyBank} tom="rosa" tamanho={80} />
           </Painel>
 
-          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-start">
+          <div className="grid gap-4 sm:gap-6 lg:grid-cols-2 lg:items-start ultra:grid-cols-3">
             {metas.map((m) => (
               <CartaoMeta key={m.id} meta={m} />
             ))}

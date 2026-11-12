@@ -4,6 +4,7 @@
 
 import {
   comprasDaFatura,
+  parcelaDaCompra,
   faturaDoMes,
   gastosPorCategoria,
   itensDoMes,
@@ -47,7 +48,8 @@ export function ritmoDeGasto(dados: Dados, perfilId: Id, mes: Mes, hoje: string)
 
   const porDia = Array.from({ length: dias }, () => 0);
   for (const t of dados.transacoes ?? []) {
-    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo || t.data.slice(0, 7) !== mes) continue;
+    if (t.perfilId !== perfilId || t.tipo !== "saida" || t.soSaldo || t.data.slice(0, 7) !== mes)
+      continue;
     const d = Math.min(dias, Math.max(1, Number(t.data.slice(8, 10))));
     porDia[d - 1] += t.valor;
   }
@@ -190,7 +192,11 @@ export function dicasDoMes(
     gastosPorCategoria(dados, perfilId, addMes(mes, -1)).map((g) => [g.categoria, g.valor]),
   );
   const subidas = agora
-    .map((g) => ({ ...g, diferenca: g.valor - (antes.get(g.categoria) ?? 0), antes: antes.get(g.categoria) ?? 0 }))
+    .map((g) => ({
+      ...g,
+      diferenca: g.valor - (antes.get(g.categoria) ?? 0),
+      antes: antes.get(g.categoria) ?? 0,
+    }))
     .filter((g) => g.antes > 0 && g.diferenca >= 5_000)
     .sort((a, b) => b.diferenca - a.diferenca);
   if (subidas[0]) {
@@ -311,18 +317,28 @@ export interface ComposicaoFatura {
   estornos: number;
 }
 
-export function composicaoFatura(cartao: Pick<Cartao, "id">, compras: Compra[], mes: Mes): ComposicaoFatura {
+export function composicaoFatura(
+  cartao: Pick<Cartao, "id">,
+  compras: Compra[],
+  mes: Mes,
+): ComposicaoFatura {
   const todas = comprasDaFatura(cartao.id, compras, mes);
   const linhas = todas.filter((l) => l.valor > 0);
-  const de = (f: (c: Compra) => boolean) => soma(linhas.filter((l) => f(l.compra)).map((l) => l.valor));
+  const de = (f: (c: Compra) => boolean) =>
+    soma(linhas.filter((l) => f(l.compra)).map((l) => l.valor));
+  // Parcela que veio do banco é um lançamento à parte ("· parcela 3/10"): conta
+  // como parcela, e como "de meses anteriores" quando não é a primeira.
+  const parcela = (c: Compra) => parcelaDaCompra(c, mes);
   return {
     estornos: soma(todas.filter((l) => l.valor < 0).map((l) => l.valor)),
-    parcelas: de((c) => !c.recorrente && c.parcelas > 1),
+    parcelas: de((c) => !c.recorrente && !!parcela(c)),
     assinaturas: de((c) => c.recorrente),
-    avulsas: de((c) => !c.recorrente && c.parcelas <= 1),
+    avulsas: de((c) => !c.recorrente && !parcela(c)),
     total: soma(todas.map((l) => l.valor)),
-    novas: de((c) => !c.recorrente && c.mesPrimeira === mes),
-    herdadas: de((c) => !c.recorrente && diffMes(mes, c.mesPrimeira) > 0),
+    novas: de((c) => !c.recorrente && c.mesPrimeira === mes && (parcela(c)?.numero ?? 1) === 1),
+    herdadas: de(
+      (c) => !c.recorrente && (diffMes(mes, c.mesPrimeira) > 0 || (parcela(c)?.numero ?? 1) > 1),
+    ),
   };
 }
 

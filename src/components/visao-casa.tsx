@@ -247,7 +247,10 @@ export function DivisaoCasa() {
 
             <div className="mt-6 mb-1 flex items-center justify-between">
               <p className="text-xs font-semibold text-ink">Maiores contas</p>
-              <Link href="/casa" className="text-xs font-medium text-primary-text hover:underline">
+              <Link
+                href="/casa"
+                className="alvo-toque text-xs font-medium text-primary-text hover:underline"
+              >
                 Ver todas
               </Link>
             </div>
@@ -297,7 +300,7 @@ export function DivisaoCasa() {
               {pendentes.length > 2 && (
                 <Link
                   href="/casa"
-                  className="block text-xs font-medium text-primary-text hover:underline"
+                  className="alvo-toque block text-xs font-medium text-primary-text hover:underline"
                 >
                   Mais {pendentes.length - 2} {pendentes.length - 2 === 1 ? "acerto" : "acertos"} na
                   tela Casa

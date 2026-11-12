@@ -127,7 +127,7 @@ export default function PaginaRenda() {
         texto="Seu salário, o que você separa para o dia a dia e o seu perfil."
       />
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-2 xl:items-start">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-2 xl:items-start ultra:grid-cols-3">
         <RendaDoMes key={mes} />
 
         <Painel className="p-4 sm:p-6">

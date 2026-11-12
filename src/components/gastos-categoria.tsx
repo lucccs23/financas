@@ -101,7 +101,7 @@ export function GastosPorCategoria() {
             <button
               type="button"
               onClick={() => setTudo((v) => !v)}
-              className="mt-4 text-xs font-medium text-primary-text hover:underline"
+              className="alvo-toque mt-4 text-xs font-medium text-primary-text hover:underline"
             >
               {tudo ? "Mostrar menos" : `Ver todas as ${atual.length} categorias`}
             </button>

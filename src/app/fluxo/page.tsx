@@ -27,7 +27,9 @@ function LinhaDetalhe({
         {nome}
         {detalhe && <span className="text-xs text-ink-3"> · {detalhe}</span>}
       </span>
-      <span className={cx("tabular whitespace-nowrap", forte ? "font-semibold text-ink" : "text-ink-2")}>
+      <span
+        className={cx("tabular whitespace-nowrap", forte ? "font-semibold text-ink" : "text-ink-2")}
+      >
         {formatar(valor)}
       </span>
     </li>
@@ -38,10 +40,7 @@ export default function PaginaFluxo() {
   const { dados, mes, mesHoje, setMes, lar } = useApp();
   const perfil = usePerfil();
   const meses = useMemo(() => intervalo(addMes(mes, -5), 12), [mes]);
-  const pontos = useMemo(
-    () => fluxoDeCaixa(dados, perfil.id, meses),
-    [dados, perfil.id, meses],
-  );
+  const pontos = useMemo(() => fluxoDeCaixa(dados, perfil.id, meses), [dados, perfil.id, meses]);
   const r = useMemo(() => resumoPessoal(dados, perfil.id, mes), [dados, perfil.id, mes]);
   const mesMin = nomeMes(mes).toLowerCase();
   const acumulado = pontos.reduce((s, p) => s + p.sobra, 0);
@@ -121,7 +120,7 @@ export default function PaginaFluxo() {
 
       <GastosPorCategoria />
 
-      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start">
+      <div className="grid gap-4 sm:gap-6 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-start ultra:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         <Painel className="p-4 sm:p-6">
           <TituloPainel>Mês a mês</TituloPainel>
           <div className="-mx-4 mt-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
@@ -168,8 +167,8 @@ export default function PaginaFluxo() {
             </table>
           </div>
           <p className="mt-4 text-xs leading-5 text-ink-3">
-            Cada mês usa o salário que valia na época (veja o histórico em Minha renda) e os
-            valores reais que você informou nas contas.
+            Cada mês usa o salário que valia na época (veja o histórico em Minha renda) e os valores
+            reais que você informou nas contas.
           </p>
         </Painel>
 
