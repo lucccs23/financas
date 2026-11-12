@@ -575,21 +575,6 @@ function aplicarCartao(
     (c) => !(c.cartaoId === doCartao.id && c.externoId && pagamentos.has(c.externoId)),
   );
 
-  // Pagamento da fatura feito ao cartão: a fatura anterior está paga.
-  for (const t of transacoes) {
-    if (ehCompra(t) || t.status === "PENDING") continue;
-    const paga = addMes(mesDaFatura(t), -1);
-    if (paga <= mesHoje) {
-      const ja = banco.lancamentos.find(
-        (l) => l.refTipo === "fatura" && l.refId === doCartao.id && l.mes === paga && l.pago,
-      );
-      if (!ja) {
-        marcarPago(banco, "fatura", doCartao.id, paga, doCartao);
-        resumo.pagas++;
-      }
-    }
-  }
-
   // Modelo antigo (uma compra parcelada inteira, com as parcelas calculadas
   // aqui): sai, e cada parcela volta como o banco lança.
   banco.compras = banco.compras.filter(
@@ -720,6 +705,33 @@ function aplicarCartao(
       c.mesPrimeira < abertaDesde ||
       chaves.has(c.externoId),
   );
+
+  // Pagamento da fatura feito ao cartão: a fatura anterior está paga. Vale
+  // também o pagamento ainda "pendente" (Nubank e Inter mostram assim por
+  // dias, mesmo com o dinheiro já debitado).
+  const mesesPagos = new Set(
+    transacoes
+      .filter((t) => !ehCompra(t))
+      .map((t) => addMes(mesDaFatura(t), -1))
+      .filter((m) => m <= mesHoje),
+  );
+  // Faturas de antes do primeiro pagamento que a busca alcança (90 dias):
+  // o banco já recebeu pagamentos depois delas, então também estão pagas.
+  if (mesesPagos.size) {
+    const primeiroPago = [...mesesPagos].sort()[0];
+    for (const c of banco.compras) {
+      if (c.cartaoId === doCartao.id && c.mesPrimeira < primeiroPago) mesesPagos.add(c.mesPrimeira);
+    }
+  }
+  for (const paga of mesesPagos) {
+    const ja = banco.lancamentos.find(
+      (l) => l.refTipo === "fatura" && l.refId === doCartao.id && l.mes === paga && l.pago,
+    );
+    if (!ja) {
+      marcarPago(banco, "fatura", doCartao.id, paga, doCartao);
+      resumo.pagas++;
+    }
+  }
 
   // Limite livre igual ao do banco.
   if (credito.availableCreditLimit != null && doCartao.limite > 0) {

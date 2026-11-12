@@ -13,7 +13,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { chaveLancamento, type ItemMes } from "./calc";
+import { chaveLancamento, mesDeReferencia, type ItemMes } from "./calc";
 import { obterBackend } from "./dados";
 import { novoId, type Backend, type Sessao } from "./dados/backend";
 import { formatar } from "./dinheiro";
@@ -110,6 +110,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [dados, setDados] = useState<Dados>(dadosVazios);
   const [hoje, setHoje] = useState("");
   const [mes, setMes] = useState<Mes>("");
+  /** A pessoa já escolheu um mês: daí em diante o app não muda o mês sozinho. */
+  const mesEscolhido = useRef(false);
+  const escolherMes = useCallback((m: Mes) => {
+    mesEscolhido.current = true;
+    setMes(m);
+  }, []);
   const [aparencia, definirAparencia] = useState<Aparencia>(APARENCIA_PADRAO);
   const [escuroNoSistema, setEscuroNoSistema] = useState(false);
   const [ocultarValores, definirOcultar] = useState(false);
@@ -185,6 +191,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setEstado("deslogado");
     }
   }, [backend, avisar]);
+
+  // Ao abrir, mostra o mês das próximas contas: se as faturas deste mês já
+  // estão pagas (ou já venceram todas), o seguinte. Só enquanto a pessoa não
+  // escolheu um mês nem mexeu em nada, para a tela não pular no meio do uso.
+  useEffect(() => {
+    if (estado !== "pronto" || !sessao || !hoje) return;
+    if (mesEscolhido.current || mexidas.current > 0) return;
+    const alvo = mesDeReferencia(dados, sessao.userId, hoje);
+    setMes((m) => (m === alvo ? m : alvo));
+  }, [estado, dados, sessao, hoje]);
 
   // Versão online: guarda o app no aparelho para abrir na hora (public/sw.js).
   useEffect(() => {
@@ -487,7 +503,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     hoje,
     mesHoje: hoje.slice(0, 7),
     mes,
-    setMes,
+    setMes: escolherMes,
     tema,
     setTema,
     aparencia,

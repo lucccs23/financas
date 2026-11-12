@@ -202,6 +202,23 @@ export function itensDoMes(dados: Dados, mes: Mes): ItemMes[] {
   return itens.sort((a, b) => a.dia - b.dia || a.nome.localeCompare(b.nome));
 }
 
+/**
+ * Mês que o app mostra ao abrir: o de hoje ou, quando as faturas dos seus
+ * cartões neste mês já estão todas pagas (ou já passou o último vencimento
+ * delas), o mês seguinte: é nele que estão as próximas contas.
+ */
+export function mesDeReferencia(dados: Dados, perfilId: Id, hoje: string): Mes {
+  const mes = hoje.slice(0, 7);
+  const meus = new Set(dados.cartoes.filter((k) => k.perfilId === perfilId).map((k) => k.id));
+  const faturas = itensDoMes(dados, mes).filter(
+    (i) => i.refTipo === "fatura" && i.valor > 0 && meus.has(i.refId),
+  );
+  if (!faturas.length) return mes;
+  const todasPagas = faturas.every((f) => f.pago);
+  const venceram = Number(hoje.slice(8, 10)) > Math.max(...faturas.map((f) => f.dia));
+  return todasPagas || venceram ? addMes(mes, 1) : mes;
+}
+
 /** A pessoa é quem tira o dinheiro do bolso para pagar este item? */
 export function souPagador(item: ItemMes, perfilId: Id, meuMoradorId: Id | null): boolean {
   return item.escopo === "pessoal"

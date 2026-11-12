@@ -387,6 +387,36 @@ describe("Open Finance", () => {
       expect(d.compras).toHaveLength(1);
     });
 
+    it("pagamento ainda pendente também paga, e faturas mais antigas que a busca ficam pagas", () => {
+      const d = base();
+      const pagamento = tx({
+        id: "pg",
+        date: "2026-11-04",
+        amount: 2645.56,
+        type: "CREDIT",
+        description: "Pagamento recebido",
+        status: "PENDING",
+        creditCardMetadata: { billForecastDate: "2026-12" },
+      });
+      aplicarOpenFinance(
+        d,
+        conexao([
+          {
+            conta: cartaoSemFechamento("2026-11-09"),
+            transacoes: [
+              compra("velha", "2026-09-05", 50, "2026-10"),
+              compra("a", "2026-10-20", 10, "2026-11"),
+              compra("b", "2026-11-05", 20, "2026-12"),
+              pagamento,
+            ],
+          },
+        ]),
+        HOJE2,
+      );
+      const pagas = d.lancamentos.filter((l) => l.pago).map((l) => l.mes).sort();
+      expect(pagas).toEqual(["2026-10", "2026-11"]);
+    });
+
     it("Inter: \"PAGAMENTO ON LINE\" é pagamento, mesmo classificado como compra", () => {
       const d = base();
       const pagamento = tx({
