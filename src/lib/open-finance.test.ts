@@ -226,12 +226,20 @@ describe("Open Finance", () => {
       nomeDoBanco([{ name: "Nu Pagamentos S.A. - Instituição de Pagamento (Conta Pré-paga)" }]),
     ).toBe("Nubank");
     expect(nomeDoBanco([{ name: "portobank" }])).toBe("Porto Bank");
+    // O nome vence o código: a Porto Bank usa o código do Itaú.
+    expect(nomeDoBanco([{ name: "portobank", bankData: { transferNumber: "341/0001/1-2" } }])).toBe(
+      "Porto Bank",
+    );
     expect(nomeDoBanco([{ name: "Conta corrente", bankData: { transferNumber: "0001/123-4" } }])).toBeNull();
 
     const d = base();
     const generica = { ...corrente, name: "Nu Pagamentos S.A. (Conta Pré-paga)" };
     aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Banco", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
     expect(d.carteiras[0].nome).toBe("Banco");
+    aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
+    expect(d.carteiras[0].nome).toBe("Nubank");
+    // Palpite errado de antes ("Itaú") também é corrigido.
+    d.carteiras[0].nome = "Itaú";
     aplicarOpenFinance(d, [{ perfilId: "eu", banco: "Nubank", contas: [{ conta: generica, transacoes: [] }] }], HOJE);
     expect(d.carteiras[0].nome).toBe("Nubank");
     d.carteiras[0].nome = "Minha conta";

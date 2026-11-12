@@ -150,19 +150,32 @@ const NOMES: [RegExp, string][] = [
 
 /**
  * Descobre o nome do banco de uma conexão pelas contas dela: primeiro pelo
- * código do banco no número de transferência, depois pelo nome da conta.
+ * nome da conta, depois pelo código do banco no número de transferência (o
+ * código pode ser do banco parceiro: a Porto Bank usa o do Itaú).
  */
 export function nomeDoBanco(contas: Pick<ContaPluggy, "name" | "marketingName" | "bankData">[]) {
-  for (const c of contas) {
-    const codigo = c.bankData?.transferNumber?.match(/^\s*(\d{1,3})\s*[/-]/)?.[1];
-    if (codigo && CODIGOS[codigo.padStart(3, "0")]) return CODIGOS[codigo.padStart(3, "0")];
-  }
   for (const c of contas) {
     const texto = normalizar(`${c.marketingName ?? ""} ${c.name ?? ""}`);
     const achado = NOMES.find(([r]) => r.test(texto))?.[1];
     if (achado) return achado;
   }
+  for (const c of contas) {
+    const codigo = c.bankData?.transferNumber?.match(/^\s*(\d{1,3})\s*[/-]/)?.[1];
+    if (codigo && CODIGOS[codigo.padStart(3, "0")]) return CODIGOS[codigo.padStart(3, "0")];
+  }
   return null;
+}
+
+/** Nome que o próprio app deu (genérico ou de um palpite anterior), e não você. */
+function nomeAutomatico(nome: string, conta: ContaPluggy) {
+  const base = nome.replace(/ · Poupança$/, "");
+  return (
+    base === "Banco" ||
+    nome === conta.marketingName?.trim() ||
+    nome === conta.name?.trim() ||
+    Object.values(CODIGOS).includes(base) ||
+    NOMES.some(([, n]) => n === base)
+  );
 }
 
 /* ───────────────────────── Ajudantes ───────────────────────── */
@@ -300,13 +313,7 @@ function aplicarConta(
   let carteira = banco.carteiras.find((c) => c.externoId === conta.id);
   // Nome genérico que veio de uma busca anterior: troca pelo nome do banco.
   // Um nome que você mesmo escolheu fica como está.
-  if (
-    carteira &&
-    conexao.banco !== "Banco" &&
-    [conta.marketingName?.trim(), conta.name?.trim(), "Banco", "Banco · Poupança"].includes(
-      carteira.nome,
-    )
-  ) {
+  if (carteira && conexao.banco !== "Banco" && nomeAutomatico(carteira.nome, conta)) {
     carteira.nome = nomeBom;
   }
   if (!carteira) {
@@ -426,7 +433,7 @@ function aplicarCartao(
     banco.cartoes.push(cartao);
     resumo.cartoesNovos++;
   } else {
-    if ((!cartao.banco || cartao.banco === "Banco") && conexao.banco !== "Banco") {
+    if (conexao.banco !== "Banco" && (!cartao.banco || nomeAutomatico(cartao.banco, conta))) {
       cartao.banco = conexao.banco;
     }
     if (credito.creditLimit != null) cartao.limite = centavos(credito.creditLimit);
