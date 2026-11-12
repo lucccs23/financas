@@ -21,6 +21,10 @@ on:
         description: "Mostrar no registro o resumo dos cartões (datas e faturas)"
         type: boolean
         default: false
+      atualizar_no_banco:
+        description: "Pedir aos bancos dados novos antes de buscar (o botão Atualizar do app liga)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -58,6 +62,7 @@ jobs:
           PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
           PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES || secrets.PLUGGY_CONEXOES }}
           DIAGNOSTICO: ${{ inputs.diagnostico && '1' || '' }}
+          ATUALIZAR_NO_BANCO: ${{ inputs.atualizar_no_banco && '1' || '' }}
         run: npx tsx scripts/buscar-no-banco.ts buscar "$RUNNER_TEMP/pluggy.json"
       - name: Gravar nos dados
         working-directory: dados

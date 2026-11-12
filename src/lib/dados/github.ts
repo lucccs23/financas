@@ -5,6 +5,7 @@
 // vira uma versão no histórico do repositório, o que também serve de cópia.
 
 import type { StatusOpenFinance } from "../open-finance";
+import type { AndamentoBusca } from "./backend";
 import { TABELAS, type Dados, type Id, type Linha, type NomeTabela } from "../types";
 import { novoId, type Backend } from "./backend";
 import * as op from "./operacoes";
@@ -154,10 +155,15 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
     },
 
     async buscarNoBanco(): Promise<void> {
-      const r = await pedir(`/actions/workflows/${TAREFA_OPEN_FINANCE}/dispatches`, {
-        method: "POST",
-        body: JSON.stringify({ ref: "main" }),
-      });
+      const pedirCom = (inputs?: Record<string, string>) =>
+        pedir(`/actions/workflows/${TAREFA_OPEN_FINANCE}/dispatches`, {
+          method: "POST",
+          body: JSON.stringify(inputs ? { ref: "main", inputs } : { ref: "main" }),
+        });
+      // Pede aos bancos dados novos antes de buscar. Uma tarefa instalada antes
+      // dessa opção recusa o pedido (422): busca mesmo assim, só sem atualizar.
+      let r = await pedirCom({ atualizar_no_banco: "true" });
+      if (r.status === 422) r = await pedirCom();
       if (r.ok) return;
       if (r.status === 404) {
         throw new Error(
@@ -170,6 +176,32 @@ export function arquivoNoGitHub(conexao: ConexaoGitHub, buscar: typeof fetch = f
         );
       }
       throw falha(r);
+    },
+
+    async andamentoDaBusca(): Promise<AndamentoBusca | null> {
+      const r = await pedir(
+        `/actions/workflows/${TAREFA_OPEN_FINANCE}/runs?event=workflow_dispatch&per_page=1`,
+      );
+      if (!r.ok) return null;
+      const dados = (await r.json()) as {
+        workflow_runs?: {
+          status: string;
+          conclusion: string | null;
+          created_at: string;
+          html_url: string;
+        }[];
+      };
+      const ultima = dados.workflow_runs?.[0];
+      if (!ultima) return null;
+      const situacao: AndamentoBusca["situacao"] =
+        ultima.status !== "completed"
+          ? ultima.status === "in_progress"
+            ? "rodando"
+            : "fila"
+          : ultima.conclusion === "success"
+            ? "pronta"
+            : "falhou";
+      return { situacao, pedidaEm: ultima.created_at, endereco: ultima.html_url };
     },
   };
 }
@@ -347,6 +379,7 @@ export function criarBackendGitHub(buscar: typeof fetch = (...a) => fetch(...a))
     openFinance: {
       status: () => arquivo().lerStatusOpenFinance(),
       buscarAgora: () => arquivo().buscarNoBanco(),
+      andamento: () => arquivo().andamentoDaBusca(),
     },
 
     conexao: {

@@ -5,6 +5,15 @@
 import type { StatusOpenFinance } from "../open-finance";
 import type { Dados, Id, Linha, NomeTabela } from "../types";
 
+/** Situação de uma busca no banco rodando no GitHub. */
+export interface AndamentoBusca {
+  situacao: "fila" | "rodando" | "pronta" | "falhou";
+  /** Quando foi pedida (ISO). */
+  pedidaEm: string;
+  /** Página da busca no GitHub, para ver o que aconteceu. */
+  endereco: string;
+}
+
 export interface Sessao {
   userId: Id;
   email: string | null;
@@ -38,8 +47,13 @@ export interface Backend {
   openFinance?: {
     /** null quando a busca nunca rodou. */
     status(): Promise<StatusOpenFinance | null>;
-    /** Pede uma busca agora. Os dados chegam em uns 2 minutos. */
+    /**
+     * Pede uma busca agora, pedindo antes aos bancos dados novos. Os dados
+     * chegam em uns 2 a 4 minutos.
+     */
     buscarAgora(): Promise<void>;
+    /** Como está a última busca pedida pelo app (null se não der para saber). */
+    andamento?(): Promise<AndamentoBusca | null>;
   };
 
   /** Preparação antes do primeiro uso (ex.: levar dados antigos para o arquivo). */

@@ -70,13 +70,82 @@ function situacaoDoItem(status: string | undefined): ConexaoNoCache["situacao"] 
   return "erro";
 }
 
-async function pluggy<T>(chave: string, caminho: string): Promise<T> {
-  const r = await fetch(`${API}${caminho}`, { headers: { "X-API-KEY": chave } });
-  if (r.status === 404 && caminho.startsWith("/items/")) {
-    throw new Error("Conexão não encontrada na Pluggy. Confira o id em PLUGGY_CONEXOES.");
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Pedido à Pluggy. Falha passageira (sem rede, muitos pedidos, instabilidade
+ * do lado deles) é tentada de novo até 3 vezes, esperando cada vez mais.
+ */
+async function pluggy<T>(
+  chave: string,
+  caminho: string,
+  init: { method?: string; body?: unknown } = {},
+): Promise<T> {
+  for (let tentativa = 0; ; tentativa++) {
+    let r: Response | null = null;
+    try {
+      r = await fetch(`${API}${caminho}`, {
+        method: init.method ?? "GET",
+        headers: {
+          ...(chave ? { "X-API-KEY": chave } : {}),
+          ...(init.body !== undefined ? { "content-type": "application/json" } : {}),
+        },
+        body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
+      });
+    } catch {
+      r = null; // sem rede
+    }
+    const passageira = !r || r.status === 429 || r.status >= 500;
+    if (passageira && tentativa < 3) {
+      await esperar(1000 * 3 ** tentativa);
+      continue;
+    }
+    if (!r) throw new Error("Sem conexão com a Pluggy. Tente de novo mais tarde.");
+    if (r.status === 404 && caminho.startsWith("/items/")) {
+      throw new Error("Conexão não encontrada na Pluggy. Confira o id em PLUGGY_CONEXOES.");
+    }
+    if (!r.ok) throw new Error(`A Pluggy respondeu com erro ${r.status}. Tente de novo mais tarde.`);
+    return (await r.json()) as T;
   }
-  if (!r.ok) throw new Error(`A Pluggy respondeu com erro ${r.status}. Tente de novo mais tarde.`);
-  return (await r.json()) as T;
+}
+
+interface ItemPluggy {
+  status?: string;
+  lastUpdatedAt?: string | null;
+  connector?: { name?: string };
+}
+
+/**
+ * Pede aos bancos dados novos (o mesmo que "atualizar" no Meu Pluggy) e espera
+ * terminar, até 2 minutos e meio. Se o banco não deixar agora, segue com os
+ * dados que a Pluggy já tem (ela atualiza sozinha uma vez por dia).
+ */
+async function atualizarNosBancos(chave: string, itens: string[]) {
+  const pedidos = await Promise.all(
+    itens.map(async (item) => {
+      try {
+        await pluggy(chave, `/items/${item}`, { method: "PATCH", body: {} });
+        return true;
+      } catch (e) {
+        console.log(`  Atualizar no banco: ${e instanceof Error ? e.message : e}`);
+        return false;
+      }
+    }),
+  );
+  const pendentes = new Set(itens.filter((_, i) => pedidos[i]));
+  const limite = Date.now() + 150_000;
+  while (pendentes.size && Date.now() < limite) {
+    await esperar(5000);
+    for (const item of [...pendentes]) {
+      const dados = await pluggy<ItemPluggy>(chave, `/items/${item}`).catch(() => null);
+      if (dados && dados.status !== "UPDATING") pendentes.delete(item);
+    }
+  }
+  const prontas = pedidos.filter(Boolean).length - pendentes.size;
+  console.log(
+    `Atualização nos bancos: ${prontas} de ${itens.length} conexão(ões) prontas` +
+      (pendentes.size ? `, ${pendentes.size} ainda atualizando (fica para a próxima busca).` : "."),
+  );
 }
 
 async function buscar(cache: string) {
@@ -87,16 +156,25 @@ async function buscar(cache: string) {
   const config = lerConfiguracao(process.env.PLUGGY_CONEXOES ?? "");
   if (!config.length) throw new Error("PLUGGY_CONEXOES está vazia: informe os ids das conexões.");
 
-  const auth = await fetch(`${API}/auth`, {
+  // A chave do pedido de login não existe ainda: "pluggy()" vai sem ela.
+  const { apiKey } = await pluggy<{ apiKey: string }>("", "/auth", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ clientId, clientSecret }),
+    body: { clientId, clientSecret },
+  }).catch((e: unknown) => {
+    throw new Error(
+      `A Pluggy recusou as credenciais (${e instanceof Error ? e.message : String(e)}).`,
+    );
   });
-  if (!auth.ok) throw new Error(`A Pluggy recusou as credenciais (erro ${auth.status}).`);
-  const { apiKey } = (await auth.json()) as { apiKey: string };
 
   const desde = new Date(Date.now() - DIAS * 86_400_000).toISOString().slice(0, 10);
   const conexoes: ConexaoNoCache[] = [];
+
+  if (process.env.ATUALIZAR_NO_BANCO) {
+    await atualizarNosBancos(
+      apiKey,
+      config.map((c) => c.item),
+    );
+  }
 
   for (const { item, perfil, apelido } of config) {
     const conexao: ConexaoNoCache = {
@@ -111,11 +189,7 @@ async function buscar(cache: string) {
     };
     conexoes.push(conexao);
     try {
-      const dados = await pluggy<{
-        status?: string;
-        lastUpdatedAt?: string | null;
-        connector?: { name?: string };
-      }>(apiKey, `/items/${item}`);
+      const dados = await pluggy<ItemPluggy>(apiKey, `/items/${item}`);
       const conector = dados.connector?.name?.replace(/^\s*meu\s*pluggy\s*[-–:]?\s*/i, "").trim();
       conexao.situacao = situacaoDoItem(dados.status);
       conexao.atualizadoNoBancoEm = dados.lastUpdatedAt ?? null;

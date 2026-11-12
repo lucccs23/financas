@@ -249,9 +249,17 @@ gratuito para uso pessoal.
 
 **Como funciona:** uma tarefa automática no repositório **privado** dos dados
 ([scripts/open-finance/buscar-no-banco.yml](scripts/open-finance/buscar-no-banco.yml))
-roda às 7h, 13h e 19h e também pelo botão **Buscar agora**, em Carteiras. Ela
-pega na Pluggy o que mudou nos últimos 90 dias e grava no `financas.json`. A
-chave secreta da Pluggy fica só nos segredos desse repositório, nunca no site.
+roda às 7h, 13h e 19h. Ela pega na Pluggy o que mudou nos últimos 90 dias e
+grava no `financas.json`. A chave secreta da Pluggy fica só nos segredos desse
+repositório, nunca no site.
+
+**Botão Atualizar** (o ícone de setas no topo, ou em Carteiras): pede aos bancos
+dados novos na hora (o mesmo que "atualizar" no Meu Pluggy) e depois busca. Leva
+uns 2 a 4 minutos; o botão gira e mostra o andamento (na fila, pedindo aos
+bancos, gravando) e avisa quando terminar, com quantas movimentações novas
+vieram. Se a busca falhar, Carteiras mostra o link para ver o motivo no GitHub.
+As buscas automáticas só leem o que a Pluggy já tem: ela atualiza os bancos
+sozinha uma vez por dia. Falhas passageiras da Pluggy são tentadas de novo.
 
 **O que entra no app:**
 
@@ -286,7 +294,7 @@ chave secreta da Pluggy fica só nos segredos desse repositório, nunca no site.
    - **Secrets:** `PLUGGY_CLIENT_ID` e `PLUGGY_CLIENT_SECRET`;
    - **Variables:** `PLUGGY_CONEXOES`, uma conexão por linha, no formato
      `id-da-conexao = Nome do perfil no app`.
-5. Para o botão **Buscar agora**, a chave de acesso do app precisa também da
+5. Para o botão **Atualizar**, a chave de acesso do app precisa também da
    permissão **Actions: Read and write** (edite a chave no GitHub).
 
 Para conectar os bancos de outra pessoa da casa, ela faz os passos 1 e 3 na

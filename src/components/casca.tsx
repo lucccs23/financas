@@ -53,6 +53,7 @@ import { alertas } from "@/lib/calc";
 import { limitesDoMes } from "@/lib/calc-extra";
 import { categoria } from "@/lib/categorias";
 import { buscaParada } from "@/lib/open-finance";
+import { BotaoAtualizar, BuscaNoBancoProvider, useBuscaNoBanco } from "./open-finance";
 import { formatar } from "@/lib/dinheiro";
 import { addMes, anoDe, nomeMes } from "@/lib/meses";
 import {
@@ -194,33 +195,35 @@ function Estrutura({ children }: { children: ReactNode }) {
   const setGaveta = (aberta: boolean) => setGavetaEm(aberta ? caminho : null);
 
   return (
-    <OrdemContexto.Provider value={contexto}>
-      <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6 ultra:max-w-[3040px] ultra:px-8">
-        <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
-          <BarraLateral />
-        </aside>
-        {/* No celular, espaço para a barra de baixo e para o botão de lançar. */}
-        <div className="min-w-0 flex-1 pb-40 lg:pb-0">
-          <Cabecalho abrirGaveta={() => setGaveta(true)} />
-          <main className="mt-4 sm:mt-6">{children}</main>
-        </div>
-
-        <NavInferior />
-        <BotaoLancar />
-
-        {gaveta && (
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <div
-              className="absolute inset-0 animate-surgir bg-[var(--overlay)]"
-              onClick={() => setGaveta(false)}
-            />
-            <div className="absolute inset-y-0 left-0 w-[280px] animate-surgir p-4">
-              <BarraLateral />
-            </div>
+    <BuscaNoBancoProvider>
+      <OrdemContexto.Provider value={contexto}>
+        <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6 ultra:max-w-[3040px] ultra:px-8">
+          <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
+            <BarraLateral />
+          </aside>
+          {/* No celular, espaço para a barra de baixo e para o botão de lançar. */}
+          <div className="min-w-0 flex-1 pb-40 lg:pb-0">
+            <Cabecalho abrirGaveta={() => setGaveta(true)} />
+            <main className="mt-4 sm:mt-6">{children}</main>
           </div>
-        )}
-      </div>
-    </OrdemContexto.Provider>
+
+          <NavInferior />
+          <BotaoLancar />
+
+          {gaveta && (
+            <div className="fixed inset-0 z-40 lg:hidden">
+              <div
+                className="absolute inset-0 animate-surgir bg-[var(--overlay)]"
+                onClick={() => setGaveta(false)}
+              />
+              <div className="absolute inset-y-0 left-0 w-[280px] animate-surgir p-4">
+                <BarraLateral />
+              </div>
+            </div>
+          )}
+        </div>
+      </OrdemContexto.Provider>
+    </BuscaNoBancoProvider>
   );
 }
 
@@ -440,6 +443,9 @@ function BarraLateral() {
           <Palette size={16} className="text-ink-3" />
           Aparência
         </button>
+        <span className="ml-auto mr-2 sm:hidden">
+          <BotaoOcultar />
+        </span>
         <div role="radiogroup" aria-label="Tema" className="flex rounded-full bg-surface-2 p-1">
           {(
             [
@@ -547,7 +553,11 @@ function Cabecalho({ abrirGaveta }: { abrirGaveta: () => void }) {
       )}
       <div className="ml-auto flex items-center gap-2">
         <BotaoBusca />
-        <BotaoOcultar />
+        {/* No celular o olho fica no menu, para caber o Atualizar. */}
+        <span className="contents max-sm:hidden">
+          <BotaoOcultar />
+        </span>
+        <BotaoAtualizar />
         <Sino />
         <Adicionar />
       </div>
@@ -564,7 +574,7 @@ export function prazo(dias: number): string {
 }
 
 function Sino() {
-  const { dados, perfil, hoje, marcarPago, backend } = useApp();
+  const { dados, perfil, hoje, marcarPago } = useApp();
   const [aberto, setAberto] = useState(false);
   const raiz = useRef<HTMLDivElement>(null);
   const lista = useMemo(
@@ -580,18 +590,8 @@ function Sino() {
     [dados, perfil, hoje],
   );
   // Busca no banco parada há mais de 12 horas (só no modo GitHub).
-  const [parada, setParada] = useState(false);
-  useEffect(() => {
-    const of = backend.openFinance;
-    if (!of) return;
-    let vivo = true;
-    of.status()
-      .then((s) => vivo && setParada(!!s && buscaParada(s)))
-      .catch(() => undefined);
-    return () => {
-      vivo = false;
-    };
-  }, [backend]);
+  const busca = useBuscaNoBanco();
+  const parada = !!busca.status && !busca.buscando && buscaParada(busca.status);
   const total = lista.length + estourados.length + (parada ? 1 : 0);
 
   useEffect(() => {
