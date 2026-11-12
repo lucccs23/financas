@@ -243,7 +243,7 @@ export default function PaginaCartoes() {
             </div>
           )}
 
-          <ComposicaoFatura cartao={cartao} />
+          <ComposicaoFatura cartao={cartao} mes={mes} />
 
           <p className="mt-6 text-xs font-semibold text-ink">
             Lançamentos de {mesMin}

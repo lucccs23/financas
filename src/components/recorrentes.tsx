@@ -8,7 +8,7 @@ import { useApp, usePerfil } from "@/lib/app";
 import { composicaoFatura, recorrentesPorMes } from "@/lib/calc-extra";
 import { formatar, porcento } from "@/lib/dinheiro";
 import { intervalo, mesEixo, nomeMes } from "@/lib/meses";
-import type { Cartao } from "@/lib/types";
+import type { Cartao, Mes } from "@/lib/types";
 import { BarraFina, Colunas } from "./graficos";
 import { Painel, Ponto, TituloPainel } from "./ui";
 
@@ -78,8 +78,9 @@ export function RecorrentesProximos() {
   );
 }
 
-export function ComposicaoFatura({ cartao }: { cartao: Cartao }) {
-  const { dados, mes } = useApp();
+/** De onde vem o valor da fatura do mês "mes" (a mesma mostrada na tela). */
+export function ComposicaoFatura({ cartao, mes }: { cartao: Cartao; mes: Mes }) {
+  const { dados } = useApp();
   const c = useMemo(() => composicaoFatura(cartao, dados.compras, mes), [cartao, dados.compras, mes]);
   if (c.total === 0) return null;
   // As porcentagens são sobre as compras (antes dos estornos), para somarem 100%.
