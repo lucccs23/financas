@@ -142,7 +142,23 @@ async function buscar(cache: string) {
         `Conexão ${conexoes.length}: ${conexao.contas.length} conta(s), ` +
           `${conexao.contas.reduce((s, c) => s + c.transacoes.length, 0)} movimentação(ões).`,
       );
-      if (process.env.DIAGNOSTICO) diagnostico(conexao);
+      if (process.env.DIAGNOSTICO) {
+        diagnostico(conexao);
+        for (const { conta } of conexao.contas.filter((c) => c.conta.type === "CREDIT")) {
+          try {
+            const faturas = await pluggy<{
+              results: { id: string; dueDate: string; totalAmount: number }[];
+            }>(apiKey, `/bills?accountId=${conta.id}`);
+            for (const f of faturas.results.slice(-6)) {
+              console.log(
+                `    fatura oficial: vence=${String(f.dueDate).slice(0, 10)} total=${f.totalAmount} id=${f.id.slice(0, 8)}`,
+              );
+            }
+          } catch (e) {
+            console.log(`    faturas oficiais: ${e instanceof Error ? e.message : e}`);
+          }
+        }
+      }
     } catch (e) {
       conexao.situacao = "erro";
       conexao.erro = e instanceof Error ? e.message : "Erro desconhecido.";
@@ -181,6 +197,21 @@ function diagnostico(conexao: ConexaoNoCache) {
     }
     for (const [chave, g] of [...grupos].sort()) {
       console.log(`    ${chave}: ${g.n} · soma=${g.soma.toFixed(2)} · ${g.de}..${g.ate}`);
+    }
+    // Amostra das movimentações recentes, campo a campo.
+    const recentes = transacoes
+      .filter((t) => String(t.date).slice(0, 10) >= "2026-10-25")
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+      .slice(0, 40);
+    for (const t of recentes) {
+      const m = (t.creditCardMetadata ?? {}) as Record<string, unknown>;
+      console.log(
+        `    · ${String(t.date).slice(0, 10)} ${t.status ?? "-"} ${t.type} ${t.amount}` +
+          ` parc=${m.installmentNumber ?? "-"}/${m.totalInstallments ?? "-"} tot=${m.totalAmount ?? "-"}` +
+          ` compra=${String(m.purchaseDate ?? "-").slice(0, 10)} rot=${m.billForecastDate ?? "-"}` +
+          ` post=${m.billPostDate ?? "-"} bill=${String(m.billId ?? "-").slice(0, 8)}` +
+          ` cat=${t.category ?? "-"} desc=${t.description.slice(0, 22)}`,
+      );
     }
   }
 }
