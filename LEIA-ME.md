@@ -104,6 +104,13 @@ No modo computador:
   fotos que mostrem o número do cartão.
 - **Aparência:** tema claro, escuro ou automático, seis cores de destaque e texto
   maior. Vale para cada aparelho.
+- **Menu do seu jeito:** arraste os itens do menu lateral para mudar a ordem
+  (inclusive entre "Menu" e "Ajustes"), ou use o botão de organizar, com
+  setas, no celular. A ordem fica guardada no aparelho, por perfil, e a barra
+  de baixo do celular mostra os cinco primeiros.
+- **Telas largas:** em monitor ultrawide (3440 px) maximizado, o app usa a
+  largura toda e reorganiza os painéis em mais colunas. Em janelas comuns
+  (1920 px) fica como sempre.
 - **Busca (Ctrl+K)** em telas, contas, transações, compras, cartões e metas, e o
   botão do **olho**, que esconde os valores da tela.
 

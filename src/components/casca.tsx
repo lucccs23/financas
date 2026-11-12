@@ -5,9 +5,22 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  ArrowDown,
   ArrowLeftRight,
+  ArrowUp,
+  ArrowUpDown,
+  GripVertical,
   Banknote,
   Bell,
   ChevronDown,
@@ -39,6 +52,14 @@ import { useApp } from "@/lib/app";
 import { alertas } from "@/lib/calc";
 import { formatar } from "@/lib/dinheiro";
 import { addMes, anoDe, nomeMes } from "@/lib/meses";
+import {
+  mesmaOrdem,
+  moverItem,
+  moverUmPasso,
+  normalizarOrdem,
+  type GrupoMenu,
+  type OrdemMenu,
+} from "@/lib/menu-ordem";
 import { TelaEntrada, TelaPerfil } from "./entrada";
 import { LEMA_APP, Logo, NOME_APP } from "./marca";
 import { Busca } from "./busca";
@@ -71,6 +92,61 @@ const AJUSTES: ItemNav[] = [
   { href: "/renda", rotulo: "Minha renda", icone: Banknote },
 ];
 
+/* ───────────────────────── Ordem do menu ───────────────────────── */
+
+const ORDEM_PADRAO: OrdemMenu = {
+  menu: MENU.map((i) => i.href),
+  ajustes: AJUSTES.map((i) => i.href),
+};
+const ITENS = new Map([...MENU, ...AJUSTES].map((i) => [i.href, i]));
+
+interface Arraste {
+  href: string;
+  alvo: { grupo: GrupoMenu; indice: number } | null;
+}
+
+interface ContextoOrdem {
+  ordem: OrdemMenu;
+  mudar: (nova: OrdemMenu) => void;
+  organizando: boolean;
+  setOrganizando: (v: boolean) => void;
+  arraste: Arraste | null;
+  setArraste: (a: Arraste | null) => void;
+}
+
+const OrdemContexto = createContext<ContextoOrdem | null>(null);
+
+function useOrdem() {
+  const c = useContext(OrdemContexto);
+  if (!c) throw new Error("useOrdem fora da Estrutura.");
+  return c;
+}
+
+/** Ordem escolhida pela pessoa, guardada neste aparelho e separada por perfil. */
+function useOrdemGuardada(perfilId: string | undefined) {
+  const chave = `financas:menu:${perfilId ?? "-"}`;
+  const [ordem, setOrdem] = useState<OrdemMenu>(() => {
+    try {
+      return normalizarOrdem(JSON.parse(localStorage.getItem(chave) ?? "null"), ORDEM_PADRAO);
+    } catch {
+      return ORDEM_PADRAO;
+    }
+  });
+  const mudar = useCallback(
+    (nova: OrdemMenu) => {
+      setOrdem(nova);
+      try {
+        if (mesmaOrdem(nova, ORDEM_PADRAO)) localStorage.removeItem(chave);
+        else localStorage.setItem(chave, JSON.stringify(nova));
+      } catch {
+        // Sem armazenamento (janela anônima): vale até fechar.
+      }
+    },
+    [chave],
+  );
+  return { ordem, mudar };
+}
+
 export function Casca({ children }: { children: ReactNode }) {
   const { estado } = useApp();
 
@@ -100,6 +176,14 @@ export function Casca({ children }: { children: ReactNode }) {
 }
 
 function Estrutura({ children }: { children: ReactNode }) {
+  const { perfil } = useApp();
+  const { ordem, mudar } = useOrdemGuardada(perfil?.id);
+  const [organizando, setOrganizando] = useState(false);
+  const [arraste, setArraste] = useState<Arraste | null>(null);
+  const contexto = useMemo(
+    () => ({ ordem, mudar, organizando, setOrganizando, arraste, setArraste }),
+    [ordem, mudar, organizando, arraste],
+  );
   const caminho = usePathname();
   // Guarda em qual tela a gaveta foi aberta: ao navegar, ela fecha sozinha.
   const [gavetaEm, setGavetaEm] = useState<string | null>(null);
@@ -107,29 +191,31 @@ function Estrutura({ children }: { children: ReactNode }) {
   const setGaveta = (aberta: boolean) => setGavetaEm(aberta ? caminho : null);
 
   return (
-    <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6 ultra:max-w-[3040px] ultra:px-8">
-      <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
-        <BarraLateral />
-      </aside>
-      <div className="min-w-0 flex-1 pb-24 lg:pb-0">
-        <Cabecalho abrirGaveta={() => setGaveta(true)} />
-        <main className="mt-4 sm:mt-6">{children}</main>
-      </div>
-
-      <NavInferior />
-
-      {gaveta && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div
-            className="absolute inset-0 animate-surgir bg-[var(--overlay)]"
-            onClick={() => setGaveta(false)}
-          />
-          <div className="absolute inset-y-0 left-0 w-[280px] animate-surgir p-4">
-            <BarraLateral />
-          </div>
+    <OrdemContexto.Provider value={contexto}>
+      <div className="mx-auto flex min-h-dvh w-full max-w-[1600px] gap-6 p-4 sm:p-6 ultra:max-w-[3040px] ultra:px-8">
+        <aside className="sticky top-6 hidden h-[calc(100dvh-48px)] w-62 shrink-0 lg:block">
+          <BarraLateral />
+        </aside>
+        <div className="min-w-0 flex-1 pb-24 lg:pb-0">
+          <Cabecalho abrirGaveta={() => setGaveta(true)} />
+          <main className="mt-4 sm:mt-6">{children}</main>
         </div>
-      )}
-    </div>
+
+        <NavInferior />
+
+        {gaveta && (
+          <div className="fixed inset-0 z-40 lg:hidden">
+            <div
+              className="absolute inset-0 animate-surgir bg-[var(--overlay)]"
+              onClick={() => setGaveta(false)}
+            />
+            <div className="absolute inset-y-0 left-0 w-[280px] animate-surgir p-4">
+              <BarraLateral />
+            </div>
+          </div>
+        )}
+      </div>
+    </OrdemContexto.Provider>
   );
 }
 
@@ -139,21 +225,101 @@ function ativo(caminho: string, href: string): boolean {
   return href === "/" ? caminho === "/" : caminho.startsWith(href);
 }
 
-function GrupoNav({ titulo, itens }: { titulo: string; itens: ItemNav[] }) {
+/**
+ * Um grupo do menu. Os itens podem ser arrastados com o mouse (inclusive de um
+ * grupo para o outro) ou, em "Organizar", movidos com as setas: o jeito que
+ * funciona no celular e pelo teclado.
+ */
+function GrupoNav({ titulo, grupo }: { titulo: string; grupo: GrupoMenu }) {
   const caminho = usePathname();
+  const { ordem, mudar, organizando, setOrganizando, arraste, setArraste } = useOrdem();
+  const itens = ordem[grupo].map((href) => ITENS.get(href)!).filter(Boolean);
+  const alvo = arraste?.alvo?.grupo === grupo ? arraste.alvo.indice : null;
+  const primeiro = ordem.menu[0] ?? ordem.ajustes[0];
+  const ultimo = ordem.ajustes.at(-1) ?? ordem.menu.at(-1);
+
+  const apontar = (indice: number) => {
+    if (!arraste) return;
+    if (arraste.alvo?.grupo !== grupo || arraste.alvo.indice !== indice) {
+      setArraste({ ...arraste, alvo: { grupo, indice } });
+    }
+  };
+  const soltar = () => {
+    if (arraste?.alvo)
+      mudar(moverItem(ordem, arraste.href, arraste.alvo.grupo, arraste.alvo.indice));
+    setArraste(null);
+  };
+
   return (
     <nav aria-label={titulo} className="mb-6">
-      <p className="mb-2 px-4 text-xs font-medium text-ink-3">{titulo}</p>
-      <ul className="space-y-1">
-        {itens.map((item) => {
+      <div className="mb-2 flex h-6 items-center justify-between pr-1 pl-4">
+        <p className="text-xs font-medium text-ink-3">{titulo}</p>
+        {grupo === "menu" && !organizando && (
+          <BotaoIcone
+            icone={ArrowUpDown}
+            rotulo="Organizar o menu"
+            tamanho={24}
+            className="text-ink-3"
+            onClick={() => setOrganizando(true)}
+          />
+        )}
+      </div>
+      <ul
+        className={cx("space-y-1", itens.length === 0 && "min-h-10")}
+        onDragOver={(e) => {
+          if (!arraste || e.target !== e.currentTarget) return;
+          e.preventDefault();
+          apontar(itens.length);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          soltar();
+        }}
+      >
+        {itens.length === 0 && (
+          <li
+            className={cx(
+              "grid h-10 place-items-center rounded-lg border border-dashed text-xs text-ink-3",
+              alvo !== null ? "border-primary text-primary-text" : "border-line-strong",
+            )}
+          >
+            Solte um item aqui
+          </li>
+        )}
+        {itens.map((item, i) => {
           const aqui = ativo(caminho, item.href);
+          const arrastando = arraste?.href === item.href;
           return (
-            <li key={item.href}>
+            <li
+              key={item.href}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.effectAllowed = "move";
+                e.dataTransfer.setData("text/plain", item.href);
+                setArraste({ href: item.href, alvo: null });
+              }}
+              onDragEnd={() => setArraste(null)}
+              onDragOver={(e) => {
+                if (!arraste) return;
+                e.preventDefault();
+                const caixa = e.currentTarget.getBoundingClientRect();
+                apontar(e.clientY > caixa.top + caixa.height / 2 ? i + 1 : i);
+              }}
+              className={cx("group relative flex items-center gap-1", arrastando && "opacity-40")}
+            >
+              {/* Onde o item vai cair. */}
+              {alvo === i && (
+                <span className="pointer-events-none absolute inset-x-2 -top-[3px] h-0.5 rounded-full bg-primary" />
+              )}
+              {alvo === itens.length && i === itens.length - 1 && (
+                <span className="pointer-events-none absolute inset-x-2 -bottom-[3px] h-0.5 rounded-full bg-primary" />
+              )}
               <Link
                 href={item.href}
+                draggable={false}
                 aria-current={aqui ? "page" : undefined}
                 className={cx(
-                  "flex h-10 items-center gap-4 rounded-lg px-4 text-sm transition-colors",
+                  "flex h-10 min-w-0 flex-1 items-center gap-4 rounded-lg px-4 text-sm transition-colors",
                   aqui
                     ? "bg-surface-2 font-semibold text-ink"
                     : "font-medium text-ink-2 hover:bg-surface-2 hover:text-ink",
@@ -162,15 +328,61 @@ function GrupoNav({ titulo, itens }: { titulo: string; itens: ItemNav[] }) {
                 <item.icone
                   size={16}
                   strokeWidth={aqui ? 2.3 : 2}
-                  className={aqui ? "text-primary" : "text-ink-3"}
+                  className={cx("shrink-0", aqui ? "text-primary" : "text-ink-3")}
                 />
-                {item.rotulo}
+                <span className="min-w-0 flex-1 truncate">{item.rotulo}</span>
+                {!organizando && (
+                  <GripVertical
+                    size={12}
+                    aria-hidden
+                    className="shrink-0 cursor-grab text-ink-3 opacity-0 transition-opacity group-hover:opacity-100"
+                  />
+                )}
               </Link>
+              {organizando && (
+                <span className="flex shrink-0">
+                  <BotaoIcone
+                    icone={ArrowUp}
+                    rotulo={`Subir ${item.rotulo}`}
+                    tamanho={32}
+                    disabled={item.href === primeiro}
+                    onClick={() => mudar(moverUmPasso(ordem, item.href, -1))}
+                  />
+                  <BotaoIcone
+                    icone={ArrowDown}
+                    rotulo={`Descer ${item.rotulo}`}
+                    tamanho={32}
+                    disabled={item.href === ultimo}
+                    onClick={() => mudar(moverUmPasso(ordem, item.href, 1))}
+                  />
+                </span>
+              )}
             </li>
           );
         })}
       </ul>
     </nav>
+  );
+}
+
+/** Rodapé do modo "Organizar": voltar ao padrão ou terminar. */
+function FimOrganizar() {
+  const { ordem, mudar, organizando, setOrganizando } = useOrdem();
+  if (!organizando) return null;
+  return (
+    <div className="mb-6 flex items-center justify-between gap-2 rounded-lg bg-surface-2 p-2">
+      <Botao
+        tamanho="sm"
+        variante="fantasma"
+        disabled={mesmaOrdem(ordem, ORDEM_PADRAO)}
+        onClick={() => mudar(ORDEM_PADRAO)}
+      >
+        Restaurar padrão
+      </Botao>
+      <Botao tamanho="sm" variante="primario" onClick={() => setOrganizando(false)}>
+        Pronto
+      </Botao>
+    </div>
   );
 }
 
@@ -208,8 +420,9 @@ function BarraLateral() {
       </Link>
 
       <div className="rolagem-fina min-h-0 flex-1 overflow-y-auto">
-        <GrupoNav titulo="Menu" itens={MENU} />
-        <GrupoNav titulo="Ajustes" itens={AJUSTES} />
+        <GrupoNav titulo="Menu" grupo="menu" />
+        <GrupoNav titulo="Ajustes" grupo="ajustes" />
+        <FimOrganizar />
       </div>
 
       <div className="flex h-12 items-center justify-between px-4">
@@ -563,30 +776,37 @@ function Adicionar() {
 
 function NavInferior() {
   const caminho = usePathname();
+  const { ordem } = useOrdem();
+  // Na ordem padrão, os atalhos de sempre; com a ordem da pessoa, os cinco primeiros.
+  const atalhos = mesmaOrdem(ordem, ORDEM_PADRAO)
+    ? NO_CELULAR
+    : [...ordem.menu, ...ordem.ajustes].slice(0, 5);
   return (
     <nav
       aria-label="Navegação principal"
       className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-surface/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden"
     >
       <ul className="mx-auto grid max-w-[560px] grid-cols-5">
-        {MENU.filter((m) => NO_CELULAR.includes(m.href)).map((item) => {
-          const aqui = ativo(caminho, item.href);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={aqui ? "page" : undefined}
-                className={cx(
-                  "flex h-16 flex-col items-center justify-center gap-1 text-[11px]/4 font-medium transition-colors",
-                  aqui ? "text-primary-text" : "text-ink-3",
-                )}
-              >
-                <item.icone size={20} strokeWidth={aqui ? 2.3 : 1.9} />
-                {item.curto ?? item.rotulo}
-              </Link>
-            </li>
-          );
-        })}
+        {atalhos
+          .map((href) => ITENS.get(href)!)
+          .map((item) => {
+            const aqui = ativo(caminho, item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={aqui ? "page" : undefined}
+                  className={cx(
+                    "flex h-16 flex-col items-center justify-center gap-1 text-[11px]/4 font-medium transition-colors",
+                    aqui ? "text-primary-text" : "text-ink-3",
+                  )}
+                >
+                  <item.icone size={20} strokeWidth={aqui ? 2.3 : 1.9} />
+                  {item.curto ?? item.rotulo}
+                </Link>
+              </li>
+            );
+          })}
       </ul>
     </nav>
   );
