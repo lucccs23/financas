@@ -101,8 +101,8 @@ async function pluggy<T>(
       continue;
     }
     if (!r) throw new Error("Sem conexão com a Pluggy. Tente de novo mais tarde.");
-    if (r.status === 404 && caminho.startsWith("/items/")) {
-      throw new Error("Conexão não encontrada na Pluggy. Confira o id em PLUGGY_CONEXOES.");
+    if ((r.status === 404 || r.status === 403) && caminho.startsWith("/items/")) {
+      throw new ConexaoDeOutraAplicacao();
     }
     if (!r.ok) {
       // A Pluggy explica o erro no corpo da resposta ("message", "codeDescription").
@@ -112,6 +112,32 @@ async function pluggy<T>(
     }
     return (await r.json()) as T;
   }
+}
+
+/** A conexão não existe nesta aplicação da Pluggy (pode ser de outra). */
+class ConexaoDeOutraAplicacao extends Error {
+  constructor() {
+    super(
+      "Conexão não encontrada em nenhuma aplicação da Pluggy. Confira o id em PLUGGY_CONEXOES: ele vem da aplicação Demo de quem conectou.",
+    );
+  }
+}
+
+/**
+ * As aplicações da Pluggy configuradas. O conector MeuPluggy só entrega os
+ * dados de quem é dono da aplicação, então cada pessoa da casa tem a sua:
+ * PLUGGY_CLIENT_ID / PLUGGY_CLIENT_SECRET (a primeira) e, para as outras,
+ * PLUGGY_CLIENT_ID_2 / PLUGGY_CLIENT_SECRET_2, até _5.
+ */
+function aplicacoesConfiguradas() {
+  const lista: { nome: string; clientId: string; clientSecret: string }[] = [];
+  for (const sufixo of ["", "_2", "_3", "_4", "_5"]) {
+    const clientId = process.env[`PLUGGY_CLIENT_ID${sufixo}`]?.trim();
+    const clientSecret = process.env[`PLUGGY_CLIENT_SECRET${sufixo}`]?.trim();
+    if (clientId && clientSecret)
+      lista.push({ nome: `PLUGGY_CLIENT_ID${sufixo}`, clientId, clientSecret });
+  }
+  return lista;
 }
 
 interface ItemPluggy {
@@ -167,33 +193,54 @@ async function atualizarNosBancos(chave: string, itens: string[]) {
 
 async function buscar(cache: string) {
   const clientId = process.env.PLUGGY_CLIENT_ID;
-  const clientSecret = process.env.PLUGGY_CLIENT_SECRET;
-  if (!clientId || !clientSecret)
+  if (!clientId || !process.env.PLUGGY_CLIENT_SECRET)
     throw new Error("Faltam PLUGGY_CLIENT_ID e PLUGGY_CLIENT_SECRET.");
   const config = lerConfiguracao(process.env.PLUGGY_CONEXOES ?? "");
   if (!config.length) throw new Error("PLUGGY_CONEXOES está vazia: informe os ids das conexões.");
 
-  // A chave do pedido de login não existe ainda: "pluggy()" vai sem ela.
-  const { apiKey } = await pluggy<{ apiKey: string }>("", "/auth", {
-    method: "POST",
-    body: { clientId, clientSecret },
-  }).catch((e: unknown) => {
-    throw new Error(
-      `A Pluggy recusou as credenciais (${e instanceof Error ? e.message : String(e)}).`,
-    );
-  });
+  // Entra em cada aplicação. A chave do pedido de login não existe ainda:
+  // "pluggy()" vai sem ela. Uma aplicação recusada não impede as outras.
+  const chaves: string[] = [];
+  for (const app of aplicacoesConfiguradas()) {
+    try {
+      const { apiKey } = await pluggy<{ apiKey: string }>("", "/auth", {
+        method: "POST",
+        body: { clientId: app.clientId, clientSecret: app.clientSecret },
+      });
+      chaves.push(apiKey);
+    } catch (e) {
+      console.log(`${app.nome}: a Pluggy recusou as credenciais (${e instanceof Error ? e.message : e}).`);
+    }
+  }
+  if (!chaves.length) throw new Error("A Pluggy recusou as credenciais de todas as aplicações.");
+
+  // Cada conexão é de uma aplicação: acha qual (a primeira que a conhece).
+  const chaveDo = new Map<string, string>();
+  const itemDe = new Map<string, ItemPluggy>();
+  for (const { item } of config) {
+    for (const chave of chaves) {
+      try {
+        itemDe.set(item, await pluggy<ItemPluggy>(chave, `/items/${item}`));
+        chaveDo.set(item, chave);
+        break;
+      } catch (e) {
+        if (!(e instanceof ConexaoDeOutraAplicacao)) break;
+      }
+    }
+  }
 
   const desde = new Date(Date.now() - DIAS * 86_400_000).toISOString().slice(0, 10);
   const conexoes: ConexaoNoCache[] = [];
 
   if (process.env.ATUALIZAR_NO_BANCO) {
-    await atualizarNosBancos(
-      apiKey,
-      config.map((c) => c.item),
-    );
+    for (const chave of chaves) {
+      const daqui = config.map((c) => c.item).filter((i) => chaveDo.get(i) === chave);
+      if (daqui.length) await atualizarNosBancos(chave, daqui);
+    }
   }
 
   for (const { item, perfil, apelido } of config) {
+    const apiKey = chaveDo.get(item) ?? chaves[0];
     const conexao: ConexaoNoCache = {
       item,
       perfil,
@@ -206,7 +253,10 @@ async function buscar(cache: string) {
     };
     conexoes.push(conexao);
     try {
-      const dados = await pluggy<ItemPluggy>(apiKey, `/items/${item}`);
+      const dados =
+        process.env.ATUALIZAR_NO_BANCO || !itemDe.has(item)
+          ? await pluggy<ItemPluggy>(apiKey, `/items/${item}`)
+          : itemDe.get(item)!;
       const conector = dados.connector?.name?.replace(/^\s*meu\s*pluggy\s*[-–:]?\s*/i, "").trim();
       conexao.situacao = situacaoDoItem(dados.status);
       conexao.atualizadoNoBancoEm = dados.lastUpdatedAt ?? null;

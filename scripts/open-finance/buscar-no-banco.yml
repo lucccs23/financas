@@ -7,6 +7,8 @@
 #
 # Precisa, em Settings > Secrets and variables > Actions:
 #   Secrets:   PLUGGY_CLIENT_ID, PLUGGY_CLIENT_SECRET
+#              (outra pessoa da casa, com a aplicação dela na Pluggy:
+#               PLUGGY_CLIENT_ID_2 e PLUGGY_CLIENT_SECRET_2; até _5)
 #   Variables: (opcionais)
 #   PLUGGY_CONEXOES (variable ou secret; uma por linha: "<id da conexão> = <nome do perfil>")
 #              APP_REPO         (opcional; padrão: <seu usuário>/financas)
@@ -63,6 +65,14 @@ jobs:
         env:
           PLUGGY_CLIENT_ID: ${{ secrets.PLUGGY_CLIENT_ID }}
           PLUGGY_CLIENT_SECRET: ${{ secrets.PLUGGY_CLIENT_SECRET }}
+          PLUGGY_CLIENT_ID_2: ${{ secrets.PLUGGY_CLIENT_ID_2 }}
+          PLUGGY_CLIENT_SECRET_2: ${{ secrets.PLUGGY_CLIENT_SECRET_2 }}
+          PLUGGY_CLIENT_ID_3: ${{ secrets.PLUGGY_CLIENT_ID_3 }}
+          PLUGGY_CLIENT_SECRET_3: ${{ secrets.PLUGGY_CLIENT_SECRET_3 }}
+          PLUGGY_CLIENT_ID_4: ${{ secrets.PLUGGY_CLIENT_ID_4 }}
+          PLUGGY_CLIENT_SECRET_4: ${{ secrets.PLUGGY_CLIENT_SECRET_4 }}
+          PLUGGY_CLIENT_ID_5: ${{ secrets.PLUGGY_CLIENT_ID_5 }}
+          PLUGGY_CLIENT_SECRET_5: ${{ secrets.PLUGGY_CLIENT_SECRET_5 }}
           PLUGGY_CONEXOES: ${{ vars.PLUGGY_CONEXOES || secrets.PLUGGY_CONEXOES }}
           DIAGNOSTICO: ${{ inputs.diagnostico && '1' || '' }}
           ATUALIZAR_NO_BANCO: ${{ (inputs.atualizar_no_banco || github.event.client_payload.atualizar_no_banco) && '1' || '' }}

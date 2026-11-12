@@ -324,20 +324,26 @@ Meu Pluggy e depois toque em Atualizar.
    Read and write**). Com a permissão **Actions: Read** a mais, o botão também
    mostra o andamento (na fila, buscando) e o link de uma busca que falhou.
 
-**Bancos de outra pessoa da casa** (ela precisa ter criado o perfil no app):
+**Bancos de outra pessoa da casa** (ela precisa ter criado o perfil no app).
+O conector MeuPluggy só entrega os dados do dono da aplicação, então ela precisa
+da **aplicação dela** na Pluggy:
 
 1. Ela cria a conta dela em **meu.pluggy.ai** e conecta os bancos dela lá.
-2. Com ela junto: no **seu** painel da Pluggy, na aplicação **Demo**, conecte o
-   **MeuPluggy** de novo, uma vez para cada banco dela, mas entrando com o login
-   **dela** do Meu Pluggy. Cada conexão nova tem um *item id*.
-3. Em `PLUGGY_CONEXOES`, acrescente uma linha por conexão dela, com o nome do
+2. Ela faz os passos 2 e 3 de "Configurar" **com a conta dela**: cria a conta
+   de desenvolvedor em **dashboard.pluggy.ai**, a Development Application, e
+   conecta o **MeuPluggy** na aplicação **Demo** dela, uma vez por banco. Ela
+   anota o Client ID, o Client Secret e os ids das conexões.
+3. No repositório dos dados, crie os segredos `PLUGGY_CLIENT_ID_2` e
+   `PLUGGY_CLIENT_SECRET_2` com os dela (uma terceira pessoa usaria `_3`, e
+   assim até `_5`). A busca descobre sozinha de qual aplicação é cada conexão.
+4. Em `PLUGGY_CONEXOES`, acrescente uma linha por conexão dela, com o nome do
    perfil dela exatamente como está no app:
 
    ```
    id-da-conexao-dela = Nome dela
    ```
 
-4. Toque em **Atualizar**. As contas e cartões dela aparecem só no perfil dela.
+5. Toque em **Atualizar**. As contas e cartões dela aparecem só no perfil dela.
 
 > O painel de desenvolvedor da Pluggy começa com 15 dias de teste. Pela
 > documentação do Meu Pluggy, a busca continua funcionando depois disso; se a
