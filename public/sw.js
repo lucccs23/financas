@@ -76,7 +76,9 @@ self.addEventListener("fetch", (evento) => {
       (async () => {
         const paginas = await caches.open(PAGINAS);
         const guardada = await paginas.match(chave);
-        const nova = fetch(pedido)
+        // "no-cache": confere com o site, sem a cópia de 10 minutos do navegador,
+        // para uma versão nova chegar já na próxima abertura.
+        const nova = fetch(url.href, { cache: "no-cache", credentials: "same-origin" })
           .then(async (resposta) => {
             if (resposta.ok) {
               const html = await resposta.clone().text();
