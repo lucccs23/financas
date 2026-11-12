@@ -99,7 +99,6 @@ interface AppCtx {
 
 const Contexto = createContext<AppCtx | null>(null);
 
-
 function mensagem(erro: unknown): string {
   return erro instanceof Error ? erro.message : "Algo deu errado.";
 }
@@ -181,7 +180,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const aoVoltar = () => {
       if (document.visibilityState === "visible" && estadoRef.current === "pronto") {
-        void backend.carregar().then(setDados).catch(() => undefined);
+        void backend
+          .carregar()
+          .then(setDados)
+          .catch(() => undefined);
       }
     };
     document.addEventListener("visibilitychange", aoVoltar);
@@ -223,15 +225,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => consulta.removeEventListener("change", mudou);
   }, []);
 
-  const setAparencia = useCallback((mudancas: Partial<Aparencia>) => {
-    const nova = { ...aparenciaRef.current, ...mudancas };
-    aparenciaRef.current = nova;
-    definirAparencia(nova);
-    if (!guardarAparencia(nova)) {
-      avisar("Não coube no armazenamento deste aparelho. A mudança vale só até fechar o app.", "erro");
-    }
-    aplicarAparencia(nova);
-  }, [avisar]);
+  const setAparencia = useCallback(
+    (mudancas: Partial<Aparencia>) => {
+      const nova = { ...aparenciaRef.current, ...mudancas };
+      aparenciaRef.current = nova;
+      definirAparencia(nova);
+      if (!guardarAparencia(nova)) {
+        avisar(
+          "Não coube no armazenamento deste aparelho. A mudança vale só até fechar o app.",
+          "erro",
+        );
+      }
+      aplicarAparencia(nova);
+    },
+    [avisar],
+  );
 
   // A janela do app pode ficar aberta por dias: confere a data a cada minuto e
   // ao voltar para a janela. Na virada do mês, quem olhava o mês atual passa
@@ -288,9 +296,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async <K extends NomeTabela>(tabela: K, id: Id, mudancas: Partial<Linha<K>>) => {
       setDados((d) => ({
         ...d,
-        [tabela]: (d[tabela] as Linha<K>[]).map((x) =>
-          x.id === id ? { ...x, ...mudancas } : x,
-        ),
+        [tabela]: (d[tabela] as Linha<K>[]).map((x) => (x.id === id ? { ...x, ...mudancas } : x)),
       }));
       await gravar(() => backend.atualizar(tabela, id, mudancas));
     },
@@ -377,9 +383,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [lancar],
   );
 
+  // Em paralelo: no modo GitHub vira uma gravação só (um cartão do banco pode
+  // ter centenas de lançamentos; uma gravação por item estoura o limite do GitHub).
   const removerFilhos = useCallback(
     async (tabela: NomeTabela, ids: Id[]) => {
-      for (const id of ids) await remover(tabela, id);
+      await Promise.all(ids.map((id) => remover(tabela, id)));
     },
     [remover],
   );

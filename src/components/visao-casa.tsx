@@ -61,13 +61,7 @@ export function EtiquetaSaldo({ saldo }: { saldo: number }) {
   return <Etiqueta>quite</Etiqueta>;
 }
 
-export function BarraQuemPaga({
-  resumo,
-  moradores,
-}: {
-  resumo: ResumoCasa;
-  moradores: Morador[];
-}) {
+export function BarraQuemPaga({ resumo, moradores }: { resumo: ResumoCasa; moradores: Morador[] }) {
   return (
     <BarraAlta
       rotulo="Quem paga as contas da casa"
@@ -97,7 +91,9 @@ export function LinhaTransferencia({
   const para = moradores.find((m) => m.id === t.paraId);
   if (!de || !para) return null;
   const valor = (
-    <strong className="tabular font-semibold whitespace-nowrap text-ink">{formatar(t.valor)}</strong>
+    <strong className="tabular font-semibold whitespace-nowrap text-ink">
+      {formatar(t.valor)}
+    </strong>
   );
   return (
     <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
@@ -169,7 +165,11 @@ export function DivisaoCasa() {
             titulo="Você ainda não tem uma casa"
             texto="Crie uma casa para dividir as contas com quem mora com você, ou entre em uma que já existe."
           >
-            <Botao tamanho="sm" variante="primario" onClick={() => abrir({ tipo: "lar", aba: "criar" })}>
+            <Botao
+              tamanho="sm"
+              variante="primario"
+              onClick={() => abrir({ tipo: "lar", aba: "criar" })}
+            >
               <Plus size={16} />
               Criar casa
             </Botao>
@@ -210,7 +210,11 @@ export function DivisaoCasa() {
             titulo="Nenhuma conta da casa neste mês"
             texto="Cadastre aluguel, luz, mercado e o que mais vocês dividem."
           >
-            <Botao tamanho="sm" variante="primario" onClick={() => abrir({ tipo: "conta", escopo: "casa" })}>
+            <Botao
+              tamanho="sm"
+              variante="primario"
+              onClick={() => abrir({ tipo: "conta", escopo: "casa" })}
+            >
               <Plus size={16} />
               Conta da casa
             </Botao>
@@ -243,10 +247,7 @@ export function DivisaoCasa() {
 
             <div className="mt-6 mb-1 flex items-center justify-between">
               <p className="text-xs font-semibold text-ink">Maiores contas</p>
-              <Link
-                href="/casa"
-                className="text-xs font-medium text-primary-text hover:underline"
-              >
+              <Link href="/casa" className="text-xs font-medium text-primary-text hover:underline">
                 Ver todas
               </Link>
             </div>
@@ -323,9 +324,7 @@ export function useInfoCartao() {
       fatura,
       paga,
       situacao: (fatura <= 0 ? "Sem fatura" : paga ? "Paga" : "Aberta") as
-        | "Sem fatura"
-        | "Paga"
-        | "Aberta",
+        "Sem fatura" | "Paga" | "Aberta",
       vence: diaMes(cartao.diaVencimento, mes),
       limiteLivre: cartao.limite > 0 ? limiteDoCartao(cartao, dados, mesHoje).livre : null,
     };
@@ -347,8 +346,7 @@ export function CartoesResumo() {
     [dados.cartoes, perfil.id],
   );
   const meus = cartoes.filter((c) => c.perfilId === perfil.id);
-  const totalDo = (m: Mes) =>
-    meus.reduce((s, c) => s + faturaDoMes(c.id, dados.compras, m), 0);
+  const totalDo = (m: Mes) => meus.reduce((s, c) => s + faturaDoMes(c.id, dados.compras, m), 0);
   const proximos = [0, 1, 2].map((n) => {
     const m = addMes(mes, n);
     return { mes: m, valor: totalDo(m) };
@@ -455,12 +453,7 @@ export function CartoesResumo() {
           >
             Próximas faturas
           </p>
-          <ul
-            className={cx(
-              "grid h-36 grid-cols-3 gap-2",
-              meus.length === 0 && "hidden",
-            )}
-          >
+          <ul className={cx("grid h-36 grid-cols-3 gap-2", meus.length === 0 && "hidden")}>
             {proximos.map((p, i) => (
               <li
                 key={p.mes}
@@ -488,7 +481,7 @@ export function CartoesResumo() {
                 <p className="tabular mt-2 text-center text-xs font-semibold whitespace-nowrap text-ink @sm:text-[13px]/5">
                   <span className="mr-1 text-[10px]/4 font-medium text-ink-3">R$</span>
                   {/* Em painel estreito, sem centavos para caber. */}
-                  <span className="@sm:hidden">{mascara(p.valor).replace(/,d{2}$/, "")}</span>
+                  <span className="@sm:hidden">{mascara(p.valor).replace(/,\d{2}$/, "")}</span>
                   <span className="hidden @sm:inline">{mascara(p.valor)}</span>
                 </p>
               </li>

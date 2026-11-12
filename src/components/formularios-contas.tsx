@@ -215,19 +215,20 @@ export function FormConta({
       const nova: Conta = { ...linha, id: novoId(), mesInicio: mes };
       await atualizar("contas", conta.id, { mesFim: addMes(mes, -1) });
       await inserir("contas", nova);
-      // O que já foi marcado (pago, valor real) deste mês em diante passa para a conta nova.
-      for (const l of dados.lancamentos) {
-        if (l.refTipo === "conta" && l.refId === conta.id && l.mes >= mes) {
-          await atualizar("lancamentos", l.id, { refId: nova.id });
-        }
-      }
-      // Valores já guardados na reserva por estes meses passam a apontar para a conta nova.
-      for (const a of dados.aportes) {
-        const m = a.origem?.match(/^conta:(.+):(d{4}-d{2})$/);
-        if (m && m[1] === conta.id && m[2] >= mes) {
-          await atualizar("aportes", a.id, { origem: `conta:${nova.id}:${m[2]}` });
-        }
-      }
+      // O que já foi marcado (pago, valor real) deste mês em diante passa para a
+      // conta nova, e o que já foi guardado na reserva por esses meses também.
+      // Em paralelo: no modo GitHub vira uma gravação só.
+      await Promise.all([
+        ...dados.lancamentos
+          .filter((l) => l.refTipo === "conta" && l.refId === conta.id && l.mes >= mes)
+          .map((l) => atualizar("lancamentos", l.id, { refId: nova.id })),
+        ...dados.aportes.flatMap((a) => {
+          const m = a.origem?.match(/^conta:(.+):(\d{4}-\d{2})$/);
+          return m && m[1] === conta.id && m[2] >= mes
+            ? [atualizar("aportes", a.id, { origem: `conta:${nova.id}:${m[2]}` })]
+            : [];
+        }),
+      ]);
       avisar(`Mudanças valem a partir de ${nomeMes(mes).toLowerCase()}.`);
       return;
     }
@@ -660,19 +661,18 @@ export function FormCartao({
     if (cartao) {
       await atualizar("cartoes", cartao.id, linha);
       if (cartao.larId !== larId) {
-        // As compras acompanham o cartão: viram (ou deixam de ser) visíveis para a casa.
-        for (const c of dados.compras.filter((x) => x.cartaoId === cartao.id)) {
-          await atualizar("compras", c.id, { larId });
-        }
-        const faturas = dados.lancamentos.filter(
-          (l) => l.refTipo === "fatura" && l.refId === cartao.id,
-        );
-        for (const l of faturas) {
-          await atualizar("lancamentos", l.id, {
-            larId,
-            perfilId: larId ? null : cartao.perfilId,
-          });
-        }
+        // As compras acompanham o cartão: viram (ou deixam de ser) visíveis para a
+        // casa. Em paralelo: um cartão do banco pode ter centenas de lançamentos.
+        await Promise.all([
+          ...dados.compras
+            .filter((x) => x.cartaoId === cartao.id)
+            .map((c) => atualizar("compras", c.id, { larId })),
+          ...dados.lancamentos
+            .filter((l) => l.refTipo === "fatura" && l.refId === cartao.id)
+            .map((l) =>
+              atualizar("lancamentos", l.id, { larId, perfilId: larId ? null : cartao.perfilId }),
+            ),
+        ]);
       }
     } else {
       await inserir("cartoes", linha);
@@ -700,7 +700,7 @@ export function FormCartao({
       onEnviar={salvar}
       rodape={
         <>
-          {cartao && <BotaoExcluir onClick={excluir} />}
+          {cartao && !cartao.externoId && <BotaoExcluir onClick={excluir} />}
           <Botao variante="fantasma" onClick={onFechar}>
             Cancelar
           </Botao>
@@ -806,6 +806,7 @@ export function FormCartao({
       <div className="grid grid-cols-2 gap-4">
         <Campo rotulo="Limite total">
           <EntradaValor
+            disabled={!!cartao?.externoId}
             valor={limite}
             onMudar={(v) => {
               setLimite(v);
@@ -816,8 +817,9 @@ export function FormCartao({
         </Campo>
         <Campo rotulo="Disponível agora">
           <EntradaValor
+            disabled={!!cartao?.externoId}
             valor={disponivel}
-            autoFocus={foco === "limite"}
+            autoFocus={foco === "limite" && !cartao?.externoId}
             onMudar={(v) => {
               setDisponivel(v);
               setMexeuDisponivel(true);
@@ -826,8 +828,9 @@ export function FormCartao({
         </Campo>
       </div>
       <p className="-mt-2 text-xs leading-5 text-ink-3">
-        Copie os dois valores do app do banco. Depois disso, cada compra lançada aqui diminui o
-        disponível e cada fatura paga devolve.
+        {cartao?.externoId
+          ? "Os dois vêm do banco pelo Open Finance e se atualizam a cada busca."
+          : "Copie os dois valores do app do banco. Depois disso, cada compra lançada aqui diminui o disponível e cada fatura paga devolve."}
         {disponivel > limite && limite > 0 && (
           <span className="block text-warn-text">O disponível está maior que o limite total.</span>
         )}

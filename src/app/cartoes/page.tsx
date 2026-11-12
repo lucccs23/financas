@@ -204,11 +204,13 @@ export default function PaginaCartoes() {
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-ink-3">
                 <span className="min-w-0 flex-1">
-                  {cartao.limiteConferidoEm
-                    ? `Conferido com o banco em ${dataBR(cartao.limiteConferidoEm)}. Compras lançadas e faturas pagas atualizam o disponível.`
-                    : "Calculado pelas parcelas e faturas ainda não pagas. Confira com o app do banco para ficar exato."}
+                  {cartao.externoId
+                    ? `Vem do banco pelo Open Finance${cartao.limiteConferidoEm ? `, atualizado em ${dataBR(cartao.limiteConferidoEm)}` : ""}.`
+                    : cartao.limiteConferidoEm
+                      ? `Conferido com o banco em ${dataBR(cartao.limiteConferidoEm)}. Compras lançadas e faturas pagas atualizam o disponível.`
+                      : "Calculado pelas parcelas e faturas ainda não pagas. Confira com o app do banco para ficar exato."}
                 </span>
-                {meu && (
+                {meu && !cartao.externoId && (
                   <Botao
                     tamanho="sm"
                     variante="fantasma"

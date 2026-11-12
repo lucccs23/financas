@@ -380,12 +380,17 @@ export function FormCarteira({
         : "Não dá para desfazer.",
       rotulo: "Excluir carteira",
       acao: async () => {
-        for (const t of dados.transacoes) {
-          if (t.carteiraId === carteira.id)
-            await atualizar("transacoes", t.id, { carteiraId: null });
-          if (t.carteiraDestinoId === carteira.id)
-            await atualizar("transacoes", t.id, { carteiraDestinoId: null });
-        }
+        // Em paralelo: no modo GitHub vira uma gravação só.
+        await Promise.all(
+          dados.transacoes.flatMap((t) => [
+            ...(t.carteiraId === carteira.id
+              ? [atualizar("transacoes", t.id, { carteiraId: null })]
+              : []),
+            ...(t.carteiraDestinoId === carteira.id
+              ? [atualizar("transacoes", t.id, { carteiraDestinoId: null })]
+              : []),
+          ]),
+        );
         await remover("carteiras", carteira.id);
         avisar("Carteira excluída.");
       },
@@ -404,7 +409,7 @@ export function FormCarteira({
       onEnviar={salvar}
       rodape={
         <>
-          {carteira && (
+          {carteira && !carteira.externoId && (
             <Botao variante="fantasma" onClick={excluir} className="mr-auto !text-bad-text">
               <Trash2 size={16} />
               Excluir
@@ -440,12 +445,14 @@ export function FormCarteira({
       <Campo
         rotulo={carteira ? "Saldo hoje" : "Saldo atual"}
         dica={
-          carteira
-            ? "Se o saldo do banco estiver diferente, corrija aqui: a diferença vira um ajuste no extrato."
-            : "Quanto tem nela hoje. Daqui pra frente, as transações atualizam o saldo."
+          carteira?.externoId
+            ? "Vem do banco pelo Open Finance e se atualiza a cada busca."
+            : carteira
+              ? "Se o saldo do banco estiver diferente, corrija aqui: a diferença vira um ajuste no extrato."
+              : "Quanto tem nela hoje. Daqui pra frente, as transações atualizam o saldo."
         }
       >
-        <EntradaValor valor={saldo} onMudar={setSaldo} />
+        <EntradaValor valor={saldo} onMudar={setSaldo} disabled={!!carteira?.externoId} />
       </Campo>
       <div>
         <span className="mb-2 block text-[13px]/5 font-medium text-ink-2">Cor</span>
@@ -455,7 +462,11 @@ export function FormCarteira({
         <div className="px-1">
           <Alternar
             titulo="Arquivar"
-            descricao="Some do saldo total e das listas, mas o histórico fica."
+            descricao={
+              carteira.externoId
+                ? "Some do saldo total e das listas, mas o histórico fica. Ela continua vindo do banco; para parar de vez, tire a conexão no GitHub."
+                : "Some do saldo total e das listas, mas o histórico fica."
+            }
             ligado={arquivada}
             onMudar={setArquivada}
           />
@@ -522,20 +533,23 @@ export function FormImportarExtrato({ onFechar }: { onFechar: () => void }) {
   const importar = async () => {
     if (!escolhidas.length) return;
     setOcupado(true);
-    for (const l of escolhidas) {
-      await inserir("transacoes", {
-        id: novoId(),
-        perfilId: sessao?.userId ?? "",
-        data: l.data,
-        descricao: l.descricao,
-        valor: l.valor,
-        tipo: l.tipo,
-        categoria: l.categoria,
-        carteiraId: carteiraId || null,
-        carteiraDestinoId: null,
-        observacao: "",
-      });
-    }
+    // Em paralelo: no modo GitHub vira uma gravação só.
+    await Promise.all(
+      escolhidas.map((l) =>
+        inserir("transacoes", {
+          id: novoId(),
+          perfilId: sessao?.userId ?? "",
+          data: l.data,
+          descricao: l.descricao,
+          valor: l.valor,
+          tipo: l.tipo,
+          categoria: l.categoria,
+          carteiraId: carteiraId || null,
+          carteiraDestinoId: null,
+          observacao: "",
+        }),
+      ),
+    );
     setOcupado(false);
     onFechar();
     avisar(`${escolhidas.length} transações importadas.`);

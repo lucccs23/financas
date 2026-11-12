@@ -50,7 +50,13 @@ interface Linha extends LinhaImportada {
   duplicada: boolean;
 }
 
-export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; onFechar: () => void }) {
+export function FormImportar({
+  cartaoId: inicial,
+  onFechar,
+}: {
+  cartaoId?: Id;
+  onFechar: () => void;
+}) {
   const { dados, sessao, mes, hoje, inserir, avisar } = useApp();
   const meus = dados.cartoes.filter((c) => c.perfilId === sessao?.userId);
   const [cartaoId, setCartaoId] = useState<Id>(
@@ -77,7 +83,10 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
   const usarLidas = (nome: string, lidas: LinhaImportada[]) => {
     if (!cartao) return;
     const compras = lidas.filter((l) => l.valor > 0);
-    const ultima = (compras.length ? compras : lidas).map((l) => l.data).sort().at(-1) as string;
+    const ultima = (compras.length ? compras : lidas)
+      .map((l) => l.data)
+      .sort()
+      .at(-1) as string;
     setNomeArquivo(nome);
     setFatura(mesPrimeiraFatura(cartao, ultima));
     setAjustes({});
@@ -88,7 +97,10 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
     try {
       const lido = lerFaturaTexto(await textoDoPdf(arquivo, comSenha), hoje);
       if (!lido.linhas.length) {
-        avisar("Não achei compras nesse PDF. Ele precisa ser a fatura com a lista de lançamentos.", "erro");
+        avisar(
+          "Não achei compras nesse PDF. Ele precisa ser a fatura com a lista de lançamentos.",
+          "erro",
+        );
         return;
       }
       setArquivoComSenha(null);
@@ -157,7 +169,8 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
   const importar = async () => {
     if (!cartao || !escolhidas.length) return;
     setOcupado(true);
-    for (const l of escolhidas) {
+    // Em paralelo: no modo GitHub vira uma gravação só.
+    const novas = escolhidas.map((l): Compra => {
       const parcelado = projetar && l.parcela;
       const compra: Compra = {
         id: novoId(),
@@ -173,16 +186,17 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
         data: l.data,
         categoria: l.categoria,
       };
-      await inserir("compras", compra);
-    }
+      return compra;
+    });
+    await Promise.all(novas.map((c) => inserir("compras", c)));
     setOcupado(false);
     onFechar();
-    avisar(`${escolhidas.length} compras importadas na fatura de ${nomeMes(fatura).toLowerCase()}.`);
+    avisar(
+      `${escolhidas.length} compras importadas na fatura de ${nomeMes(fatura).toLowerCase()}.`,
+    );
   };
 
-  const nomesColunas = (tabela?.[0] ?? []).map((n, i) =>
-    cabecalho && n ? n : `Coluna ${i + 1}`,
-  );
+  const nomesColunas = (tabela?.[0] ?? []).map((n, i) => (cabecalho && n ? n : `Coluna ${i + 1}`));
 
   return (
     <Modal
@@ -228,7 +242,9 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
                 className="flex h-12 w-full items-center gap-2 rounded-lg border border-dashed border-line-strong bg-surface-2 px-4 text-left text-sm text-ink-2 transition-colors hover:bg-surface-3"
               >
                 <FileUp size={16} className="shrink-0 text-ink-3" />
-                <span className="truncate">{lendo ? "Lendo o arquivo..." : nomeArquivo || "Escolher PDF ou CSV"}</span>
+                <span className="truncate">
+                  {lendo ? "Lendo o arquivo..." : nomeArquivo || "Escolher PDF ou CSV"}
+                </span>
               </button>
               <input
                 ref={entrada}
@@ -275,14 +291,16 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
             <p
               className={cx(
                 "tabular rounded-2xl px-4 py-2 text-[13px]/5",
-                linhas.filter((l) => l.valor > 0).reduce((s, l) => s + l.valor, 0) === pdf.totalInformado
+                linhas.filter((l) => l.valor > 0).reduce((s, l) => s + l.valor, 0) ===
+                  pdf.totalInformado
                   ? "bg-good-soft text-good-text"
                   : "bg-warn-soft text-warn-text",
               )}
             >
               Total da fatura no PDF: {formatar(pdf.totalInformado)} · soma das compras lidas:{" "}
               {formatar(linhas.filter((l) => l.valor > 0).reduce((s, l) => s + l.valor, 0))}
-              {linhas.filter((l) => l.valor > 0).reduce((s, l) => s + l.valor, 0) === pdf.totalInformado
+              {linhas.filter((l) => l.valor > 0).reduce((s, l) => s + l.valor, 0) ===
+              pdf.totalInformado
                 ? " · tudo certo"
                 : " · confira se faltou alguma compra"}
             </p>
@@ -293,47 +311,56 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
               <Upload size={16} className="mt-0.5 shrink-0" />
               <p>
                 O app tenta reconhecer sozinho a data, a descrição e o valor de cada compra, e
-                sugere uma categoria pelo nome da loja. Você confere tudo antes de importar.
-                Compras que já estão lançadas aparecem desmarcadas.
+                sugere uma categoria pelo nome da loja. Você confere tudo antes de importar. Compras
+                que já estão lançadas aparecem desmarcadas.
               </p>
             </div>
           ) : (
             <>
               {tabela && (
-              <details className="group rounded-2xl border border-line px-4 py-4">
-                <summary className="cursor-pointer list-none text-[13px]/5 text-ink-2 [&::-webkit-details-marker]:hidden">
-                  <span className="font-medium text-ink">Colunas do arquivo:</span>{" "}
-                  {nomesColunas[colunas.data]}, {nomesColunas[colunas.descricao]} e{" "}
-                  {nomesColunas[colunas.valor]}.{" "}
-                  <span className="font-medium text-primary-text group-open:hidden">Ajustar</span>
-                </summary>
-              <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                {(["data", "descricao", "valor"] as const).map((campo) => (
-                  <Campo
-                    key={campo}
-                    rotulo={campo === "data" ? "Coluna da data" : campo === "descricao" ? "Coluna da descrição" : "Coluna do valor"}
-                  >
-                    <Selecao
-                      value={colunas[campo]}
-                      onChange={(e) => {
-                        setColunas((c) => ({ ...c, [campo]: Number(e.target.value) }));
-                        setAjustes({});
-                      }}
-                    >
-                      {nomesColunas.map((n, i) => (
-                        <option key={i} value={i}>
-                          {n}
-                        </option>
-                      ))}
-                    </Selecao>
-                  </Campo>
-                ))}
-              </div>
-              </details>
+                <details className="group rounded-2xl border border-line px-4 py-4">
+                  <summary className="cursor-pointer list-none text-[13px]/5 text-ink-2 [&::-webkit-details-marker]:hidden">
+                    <span className="font-medium text-ink">Colunas do arquivo:</span>{" "}
+                    {nomesColunas[colunas.data]}, {nomesColunas[colunas.descricao]} e{" "}
+                    {nomesColunas[colunas.valor]}.{" "}
+                    <span className="font-medium text-primary-text group-open:hidden">Ajustar</span>
+                  </summary>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                    {(["data", "descricao", "valor"] as const).map((campo) => (
+                      <Campo
+                        key={campo}
+                        rotulo={
+                          campo === "data"
+                            ? "Coluna da data"
+                            : campo === "descricao"
+                              ? "Coluna da descrição"
+                              : "Coluna do valor"
+                        }
+                      >
+                        <Selecao
+                          value={colunas[campo]}
+                          onChange={(e) => {
+                            setColunas((c) => ({ ...c, [campo]: Number(e.target.value) }));
+                            setAjustes({});
+                          }}
+                        >
+                          {nomesColunas.map((n, i) => (
+                            <option key={i} value={i}>
+                              {n}
+                            </option>
+                          ))}
+                        </Selecao>
+                      </Campo>
+                    ))}
+                  </div>
+                </details>
               )}
 
               <div className="grid gap-4 rounded-2xl bg-surface-2 p-4 sm:grid-cols-2">
-                <Campo rotulo="Entra na fatura de" dica="Calculado pela compra mais recente do arquivo.">
+                <Campo
+                  rotulo="Entra na fatura de"
+                  dica="Calculado pela compra mais recente do arquivo."
+                >
                   <SeletorMes valor={fatura} onMudar={setFatura} base={mes} />
                 </Campo>
                 <div className="space-y-4 sm:pt-6">
@@ -376,7 +403,9 @@ export function FormImportar({ cartaoId: inicial, onFechar }: { cartaoId?: Id; o
                         className="h-4 w-4 shrink-0 accent-[var(--primary)]"
                       />
                       <span className="min-w-0 flex-1 basis-40">
-                        <span className="block truncate text-sm font-medium text-ink">{l.descricao}</span>
+                        <span className="block truncate text-sm font-medium text-ink">
+                          {l.descricao}
+                        </span>
                         <span className="flex flex-wrap items-center gap-2 text-xs text-ink-3">
                           {dataBR(l.data)}
                           {l.parcela && (
