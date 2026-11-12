@@ -288,7 +288,12 @@ export function Colunas({
 }) {
   const [foco, setFoco] = useState<number | null>(null);
   const todos = grupos.flatMap((g) => g.valores);
-  const { base, topo, marcas } = escalaRedonda(Math.min(0, ...todos), Math.max(0, ...todos, 100));
+  // Sem dados, a escala vai até R$ 100 (10.000 centavos): divisões de R$ 25, e não
+  // de centavos, que viravam "0 0 1 1 1" depois de arredondadas.
+  const { base, topo, marcas } = escalaRedonda(
+    Math.min(0, ...todos),
+    Math.max(0, ...todos, 10_000),
+  );
   const faixa = topo - base;
   const altPct = (v: number) => (Math.abs(v) / faixa) * 100;
   const zero = (-base / faixa) * 100;
