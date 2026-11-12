@@ -1,0 +1,59 @@
+# Publica a versão online no GitHub Pages a cada envio para a branch main.
+#
+# Os dados NÃO ficam aqui: ficam num repositório privado à parte (financas.json),
+# que cada aparelho abre com a própria chave de acesso. Opcional: a variável
+# DADOS_REPO (Settings > Secrets and variables > Actions > Variables), com
+# "usuario/repositorio-dos-dados", já deixa o nome preenchido na tela de conexão.
+#
+# Para usar o Supabase em vez do repositório privado, crie também as variáveis
+# SUPABASE_URL e SUPABASE_ANON_KEY (veja o LEIA-ME).
+name: Publicar online
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  gerar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+      - name: Gerar o site
+        run: npx next build
+        env:
+          GITHUB_PAGES: "1"
+          # Endereço fica https://<usuario>.github.io/<repositorio>/
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_DADOS_REPO: ${{ vars.DADOS_REPO || format('{0}/financas-dados', github.repository_owner) }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
+      - run: touch .next-online/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .next-online
+
+  publicar:
+    needs: gerar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

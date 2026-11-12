@@ -1,0 +1,350 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ───────── Cores e medidas do app. Tudo passa por estas variáveis. ───────── */
+
+:root {
+  color-scheme: light;
+
+  /* superfícies */
+  --bg: #f1f2f5;
+  --surface: #ffffff;
+  --surface-2: #f6f7f9;
+  --surface-3: #eceef2;
+  --line: #e8eaef;
+  --line-strong: #d3d7df;
+
+  /* texto */
+  --ink: #0b0d12;
+  --ink-2: #474d5b;
+  --ink-3: #858b99;
+
+  /* marca */
+  --primary: #2563eb;
+  --primary-hover: #1d54d4;
+  --primary-ink: #ffffff;
+  --primary-soft: #e8f0ff;
+  --primary-text: #1d4fd0;
+
+  /* estados: sempre acompanhados de ícone e texto */
+  --good: #0ca30c;
+  --good-text: #0a6f0a;
+  --good-soft: #e5f6e5;
+  --warn: #fab219;
+  --warn-text: #8a5800;
+  --warn-soft: #fff3d1;
+  --bad: #d03b3b;
+  --bad-text: #b02a2a;
+  --bad-soft: #fde9e9;
+
+  /* pessoas: paleta categórica validada, sempre nesta ordem */
+  --s1: #2a78d6;
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --s6: #008300;
+  --s7: #6250d6;
+  --s8: #e34948;
+  --s4-ink: #0b0b0b;
+
+  /* barra do saldo: um tom só para os gastos, outro para o que sobra */
+  --seg-casa: #104281;
+  --seg-pessoal: #2a78d6;
+  --seg-dia: #86b6ef;
+  --seg-sobra: #1baf7a;
+
+  /* gráficos */
+  --grid: #e9ebef;
+  --axis: #c9cdd6;
+  --entrada: #2a78d6;
+  --saida: #eb6834;
+
+  /* marca: logo, ícone e tela de entrada acompanham a cor de destaque */
+  --marca-de: #5b9bff;
+  --marca-ate: #1f55d6;
+  --marca-fundo: #142a6e;
+
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 2px 6px rgba(16, 24, 40, 0.03);
+  --shadow-pop: 0 12px 32px -8px rgba(16, 24, 40, 0.18), 0 2px 6px rgba(16, 24, 40, 0.06);
+  --overlay: rgba(11, 13, 18, 0.45);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0b0c0f;
+  --surface: #16181d;
+  --surface-2: #1c1f25;
+  --surface-3: #252931;
+  --line: #262a32;
+  --line-strong: #363b46;
+
+  --ink: #f1f2f4;
+  --ink-2: #b7bcc7;
+  --ink-3: #7e8595;
+
+  --primary: #3b82f6;
+  --primary-hover: #5593f8;
+  --primary-ink: #ffffff;
+  --primary-soft: #16264a;
+  --primary-text: #8fb6ff;
+
+  --good: #0ca30c;
+  --good-text: #5ad05a;
+  --good-soft: #10271a;
+  --warn: #fab219;
+  --warn-text: #fbc24a;
+  --warn-soft: #2c2208;
+  --bad: #d03b3b;
+  --bad-text: #f08c8c;
+  --bad-soft: #2e1515;
+
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --s5: #d55181;
+  --s6: #008300;
+  --s7: #9085e9;
+  --s8: #e66767;
+  --s4-ink: #ffffff;
+
+  --seg-casa: #b7d3f6;
+  --seg-pessoal: #3987e5;
+  --seg-dia: #1c5cab;
+  --seg-sobra: #199e70;
+
+  --grid: #23262e;
+  --axis: #383d48;
+  --entrada: #3987e5;
+  --saida: #d95926;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-pop: 0 16px 40px -8px rgba(0, 0, 0, 0.6), 0 2px 8px rgba(0, 0, 0, 0.4);
+  --overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* ───────── Cores de destaque (Aparência). Os gráficos não mudam: as cores
+   de dados são fixas para continuarem legíveis e distintas. ───────── */
+
+[data-cor="violeta"] {
+  --primary: #6d4fe0;
+  --primary-hover: #5d3fd0;
+  --primary-soft: #efebff;
+  --primary-text: #5a3cc9;
+  --marca-de: #a08bff;
+  --marca-ate: #5b3fd6;
+  --marca-fundo: #2e1a6e;
+}
+[data-theme="dark"][data-cor="violeta"] {
+  --primary: #8b74f0;
+  --primary-hover: #9d89f3;
+  --primary-soft: #251d4a;
+  --primary-text: #b8a9ff;
+}
+
+[data-cor="verde"] {
+  --primary: #0b8a5c;
+  --primary-hover: #097a51;
+  --primary-soft: #e3f6ee;
+  --primary-text: #0a7a52;
+  --marca-de: #3fd19b;
+  --marca-ate: #0b8a5c;
+  --marca-fundo: #063d2a;
+}
+[data-theme="dark"][data-cor="verde"] {
+  --primary: #1f9e70;
+  --primary-hover: #26b07f;
+  --primary-soft: #0f2a20;
+  --primary-text: #6fd9ad;
+}
+
+[data-cor="rosa"] {
+  --primary: #d43a70;
+  --primary-hover: #c22f63;
+  --primary-soft: #fde8ef;
+  --primary-text: #b8325f;
+  --marca-de: #ff8fb4;
+  --marca-ate: #d43a70;
+  --marca-fundo: #5e1230;
+}
+[data-theme="dark"][data-cor="rosa"] {
+  --primary: #e0457b;
+  --primary-hover: #ea5c8d;
+  --primary-soft: #3a1624;
+  --primary-text: #ff9dbd;
+}
+
+[data-cor="laranja"] {
+  --primary: #c9530e;
+  --primary-hover: #b44a0c;
+  --primary-soft: #fdeee4;
+  --primary-text: #a9450b;
+  --marca-de: #ffa45c;
+  --marca-ate: #d4570f;
+  --marca-fundo: #5c2306;
+}
+[data-theme="dark"][data-cor="laranja"] {
+  --primary: #e46a22;
+  --primary-hover: #ee7d3a;
+  --primary-soft: #3a2010;
+  --primary-text: #ffb07f;
+}
+
+[data-cor="grafite"] {
+  --primary: #1f2937;
+  --primary-hover: #111827;
+  --primary-soft: #eceef2;
+  --primary-text: #1f2937;
+  --marca-de: #6b7280;
+  --marca-ate: #1f2937;
+  --marca-fundo: #0b0f17;
+}
+[data-theme="dark"][data-cor="grafite"] {
+  --primary: #e5e7eb;
+  --primary-hover: #f3f4f6;
+  --primary-ink: #111827;
+  --primary-soft: #262a32;
+  --primary-text: #e5e7eb;
+}
+
+/* Esconder valores: borra os números em dinheiro (campos de digitação continuam visíveis). */
+[data-ocultar] .tabular:not(input),
+[data-ocultar] .dinheiro {
+  filter: blur(7px);
+  user-select: none;
+}
+
+/* Texto maior: aumenta tudo na mesma proporção. */
+[data-tamanho="grande"] body {
+  zoom: 1.12;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-ink: var(--primary-ink);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-text: var(--primary-text);
+  --color-good: var(--good);
+  --color-good-text: var(--good-text);
+  --color-good-soft: var(--good-soft);
+  --color-warn: var(--warn);
+  --color-warn-text: var(--warn-text);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-text: var(--bad-text);
+  --color-bad-soft: var(--bad-soft);
+  --color-grid: var(--grid);
+  --color-axis: var(--axis);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+
+  --radius-card: 24px;
+
+  --animate-subir: subir 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-surgir: surgir 0.18s ease-out;
+}
+
+@keyframes subir {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes surgir {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv11", "ss03", "calt";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  [role="button"],
+  summary,
+  label[for] {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 22%, transparent);
+  }
+
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barra de rolagem discreta para listas dentro dos cartões. */
+@utility rolagem-fina {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+@utility sem-rolagem {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
