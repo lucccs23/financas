@@ -419,7 +419,12 @@ function somarDias(iso: string, n: number) {
 
 /** Compra (ou estorno) do cartão que entra no app. Pagamento da fatura não entra. */
 function ehCompra(t: TransacaoPluggy) {
-  return !(t.type === "CREDIT" && ehPagamentoDeFatura(t.category, t.description));
+  if (t.type !== "CREDIT") return true;
+  // No cartão, crédito que começa com "pagamento" é pagamento da fatura (o Inter
+  // escreve "PAGAMENTO ON LINE" e ainda classifica como compra).
+  const texto = normalizar(t.description);
+  if (/^(pag(amento|to)?|pgto)\b/.test(texto) && !/estorno/.test(texto)) return false;
+  return !ehPagamentoDeFatura(t.category, t.description);
 }
 
 /**

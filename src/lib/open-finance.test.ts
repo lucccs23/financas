@@ -387,6 +387,28 @@ describe("Open Finance", () => {
       expect(d.compras).toHaveLength(1);
     });
 
+    it("Inter: \"PAGAMENTO ON LINE\" é pagamento, mesmo classificado como compra", () => {
+      const d = base();
+      const pagamento = tx({
+        id: "pg",
+        date: "2026-10-31",
+        amount: 133.82,
+        type: "CREDIT",
+        description: "PAGAMENTO ON LINE",
+        category: "Shopping",
+        status: "PENDING",
+        creditCardMetadata: { billForecastDate: "2026-11" },
+      });
+      aplicarOpenFinance(
+        d,
+        conexao([
+          { conta: cartaoSemFechamento("2026-11-07"), transacoes: [compra("a", "2026-11-05", 571.6, "2026-11"), pagamento] },
+        ]),
+        HOJE2,
+      );
+      expect(d.compras.map((c) => c.valor)).toEqual([57_160]);
+    });
+
     it("autorização pendente antiga e esquecida não entra", () => {
       const d = base();
       aplicarOpenFinance(
