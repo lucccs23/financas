@@ -40,9 +40,22 @@ const FASES: Record<AndamentoBusca["situacao"], string> = {
   falhou: "A busca falhou.",
 };
 
+const mesmoNome = (a: string, b: string) =>
+  a.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim() ===
+  b.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
+
+/**
+ * Só as conexões da pessoa: cada um vê os próprios bancos. Uma conexão sem
+ * perfil (com erro antes de saber de quem é) aparece para todos, para dar
+ * para consertar.
+ */
+function minhasConexoes(status: StatusOpenFinance, nome: string | undefined) {
+  return status.conexoes.filter((c) => !c.perfil || !nome || mesmoNome(c.perfil, nome));
+}
+
 /** A vez mais recente em que o Meu Pluggy falou com algum banco. */
-function bancosAtualizadosEm(status: StatusOpenFinance) {
-  const datas = status.conexoes
+function bancosAtualizadosEm(status: StatusOpenFinance, nome?: string) {
+  const datas = minhasConexoes(status, nome)
     .map((c) => c.atualizadoNoBancoEm)
     .filter((d): d is string => !!d)
     .sort();
@@ -111,7 +124,11 @@ function vezDaBuscaAutomatica(status: StatusOpenFinance, agora = Date.now()) {
 }
 
 export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
-  const { backend, recarregar, avisar } = useApp();
+  const { backend, recarregar, avisar, perfil } = useApp();
+  const nomeRef = useRef(perfil?.nome);
+  useEffect(() => {
+    nomeRef.current = perfil?.nome;
+  }, [perfil?.nome]);
   const of = backend.openFinance;
   const [status, setStatus] = useState<StatusOpenFinance | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -212,7 +229,7 @@ export function BuscaNoBancoProvider({ children }: { children: ReactNode }) {
         setTimeout(() => void recarregar(), 45_000);
         const n = s.importado;
         const novos = n ? n.transacoes + n.compras : 0;
-        const noBanco = bancosAtualizadosEm(s);
+        const noBanco = bancosAtualizadosEm(s, nomeRef.current);
         if (novos || !automatico)
           avisar(
             novos
@@ -273,7 +290,9 @@ export function BotaoAtualizar() {
 
 export function PainelOpenFinance() {
   const { disponivel, status, buscando, fase, endereco, falhou, atualizar } = useBuscaNoBanco();
+  const { perfil } = useApp();
   if (!disponivel || !status) return null;
+  const conexoes = minhasConexoes(status, perfil?.nome);
 
   return (
     <Painel className="p-4 sm:p-6">
@@ -319,7 +338,7 @@ export function PainelOpenFinance() {
         </Botao>
       </div>
       <ul className="mt-4 divide-y divide-line">
-        {status.conexoes.map((c, i) => {
+        {conexoes.map((c, i) => {
           const s = SITUACAO[c.situacao] ?? SITUACAO.erro;
           return (
             <li key={i} className="flex items-center gap-4 py-4 first:pt-0 last:pb-0">

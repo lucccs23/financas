@@ -88,9 +88,16 @@ function ItemLegenda({
 }
 
 export function SaldoPrevisto() {
-  const { dados, mes, lar, eu, atualizar, avisar } = useApp();
+  const { dados, mes, mesFatura, lar, eu, atualizar, avisar } = useApp();
   const perfil = usePerfil();
-  const r = useMemo(() => resumoPessoal(dados, perfil.id, mes), [dados, perfil.id, mes]);
+  // O saldo previsto olha as contas que ainda vão ser pagas: no mês de hoje,
+  // quando as faturas dele já foram pagas ou venceram, é o mês que vem (o das
+  // faturas em aberto). Gastos e transações continuam no mês de hoje.
+  const mesContas = mesFatura;
+  const r = useMemo(
+    () => resumoPessoal(dados, perfil.id, mesContas),
+    [dados, perfil.id, mesContas],
+  );
   // Salário que caiu na conta (vindo do banco) diferente do cadastrado.
   const recebido = useMemo(() => salarioRecebido(dados, perfil.id, mes), [dados, perfil.id, mes]);
   const vigente = rendaNoMes(perfil, mes);
@@ -128,7 +135,11 @@ export function SaldoPrevisto() {
     <Painel className="p-4 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <TituloPainel>Saldo previsto</TituloPainel>
+          <TituloPainel
+            detalhe={mesContas !== mes ? nomeMes(mesContas).toLowerCase() : undefined}
+          >
+            Saldo previsto
+          </TituloPainel>
           <div className="mt-6 flex flex-wrap items-end gap-x-6 gap-y-4">
             <Valor
               centavos={r.sobra}
@@ -155,7 +166,9 @@ export function SaldoPrevisto() {
                 </p>
               )}
               <p className="mt-1 text-[13px]/5 text-ink-3">
-                valor estimado após pagar todas as contas
+                {mesContas !== mes
+                  ? `com o salário, depois de pagar as contas de ${nomeMes(mesContas).toLowerCase()}`
+                  : "valor estimado após pagar todas as contas"}
               </p>
             </div>
           </div>
