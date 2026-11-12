@@ -289,11 +289,24 @@ async function buscar(cache: string) {
         for (const { conta } of conexao.contas.filter((c) => c.conta.type === "CREDIT")) {
           try {
             const faturas = await pluggy<{
-              results: { id: string; dueDate: string; totalAmount: number }[];
+              results: {
+                id: string;
+                dueDate: string;
+                totalAmount: number;
+                minimumPaymentAmount?: number | null;
+                financeCharges?: { type?: string; amount?: number }[];
+              }[];
             }>(apiKey, `/bills?accountId=${conta.id}`);
-            for (const f of faturas.results.slice(-6)) {
+            // As mais recentes primeiro (a lista não vem em ordem garantida).
+            const recentes = [...faturas.results]
+              .sort((a, b) => String(b.dueDate).localeCompare(String(a.dueDate)))
+              .slice(0, 4);
+            for (const f of recentes) {
+              const encargos = (f.financeCharges ?? [])
+                .map((c) => `${c.type}=${c.amount}`)
+                .join(",");
               console.log(
-                `    fatura oficial: vence=${String(f.dueDate).slice(0, 10)} total=${f.totalAmount} id=${f.id.slice(0, 8)}`,
+                `    fatura oficial: vence=${String(f.dueDate).slice(0, 10)} total=${f.totalAmount} minimo=${f.minimumPaymentAmount ?? "-"}${encargos ? ` encargos=${encargos}` : ""} id=${f.id.slice(0, 8)}`,
               );
             }
           } catch (e) {
