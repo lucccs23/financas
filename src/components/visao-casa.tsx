@@ -421,10 +421,8 @@ export function CartoesResumo() {
                   key={c.id}
                   href="/cartoes"
                   aria-label={`Cartão ${c.nome}`}
-                  className={cx(
-                    "shrink-0 snap-start rounded-2xl",
-                    cartoes.length === 1 ? "w-full" : "w-[86%] max-w-[320px]",
-                  )}
+                  // Mesmo tamanho com um cartão ou com vários.
+                  className="w-[86%] max-w-[320px] shrink-0 snap-start rounded-2xl"
                 >
                   <CartaoVisual
                     cartao={c}
