@@ -2,13 +2,14 @@
 // Uso: npm run checar
 //
 // Os dois builds usam pastas próprias (.next-online e .next-e2e): a versão do
-// app usada neste computador (.next) não é tocada.
+// app usada neste computador (.next) não é trocada; ali só se atualizam os tipos.
 
 import { spawnSync } from "node:child_process";
 
 const ETAPAS = [
   ["Lint", "npx eslint", {}],
-  ["Tipos", "npx tsc --noEmit", {}],
+  // Os tipos das rotas são gerados pelo Next; num clone novo ainda não existem.
+  ["Tipos", "npx next typegen && npx tsc --noEmit", {}],
   ["Testes", "npx vitest run", {}],
   [
     "Build do site",
