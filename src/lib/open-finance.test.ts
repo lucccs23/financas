@@ -912,9 +912,9 @@ describe("Open Finance", () => {
   });
 
   it("RecargaPay é transferência, Mercado Livre não é supermercado, IOF é tarifa", () => {
-    expect(
-      categoriaDaPluggy("Services", "Recargapay *Anasouza", "saida"),
-    ).toBe("transferencia");
+    expect(categoriaDaPluggy("Services", "Recargapay *Anasouza", "saida")).toBe(
+      "transferencia",
+    );
     expect(categoriaDaPluggy(null, "MERCADOLIVRE*LOJA", "saida")).toBe(
       "compras",
     );
@@ -955,17 +955,16 @@ describe("Open Finance", () => {
 
 describe("Pix para você mesmo pelo cartão", () => {
   it("RecargaPay com o começo do seu nome é para você mesmo", () => {
-    expect(
-      paraVoceMesmo("Recargapay *Anasouza", ["ANA S LIMA", "Ana"]),
-    ).toBe(true);
-    expect(paraVoceMesmo("RECARGAPAY *ANASOUZA", [null, "Ana"])).toBe(true);
+    expect(paraVoceMesmo("Recargapay *Anasouza", ["ANA S LIMA", "Ana"])).toBe(
+      true,
+    );
+    expect(paraVoceMesmo("RECARGAPAY *ANASOUZA", [null, "Ana Souza"])).toBe(
+      true,
+    );
   });
   it("de outra pessoa, ou sem RecargaPay, não", () => {
     expect(
-      paraVoceMesmo("Recargapay *Biasouza", [
-        "Ana Souza Lima",
-        "Ana",
-      ]),
+      paraVoceMesmo("Recargapay *Biasouza", ["Ana Souza Lima", "Ana"]),
     ).toBe(false);
     expect(paraVoceMesmo("Mercadolivre*Anasouza", ["Ana"])).toBe(false);
   });

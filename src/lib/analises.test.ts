@@ -11,7 +11,7 @@ import {
 import type { Dados } from "./types";
 
 const base: Dados = {
-  perfis: [{ id: "eu", nome: "Lucas" } as Dados["perfis"][number]],
+  perfis: [{ id: "eu", nome: "Ana" } as Dados["perfis"][number]],
   lares: [],
   moradores: [],
   contas: [],
