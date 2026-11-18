@@ -1,0 +1,65 @@
+# Impede que um PR mude as próprias checagens.
+#
+# pull_request_target roda a versão deste arquivo que está no branch de destino.
+# Nunca faça checkout nem execute nada do PR aqui: a lista de arquivos e o
+# package.json do PR são lidos pela API, apenas como dados.
+name: Guarda das checagens
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+jobs:
+  guarda:
+    name: guarda
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      PR: ${{ github.event.pull_request.number }}
+      BASE: ${{ github.event.pull_request.base.sha }}
+      HEAD: ${{ github.event.pull_request.head.sha }}
+    steps:
+      - name: Conferir arquivos protegidos
+        run: |
+          set -euo pipefail
+          PROTEGIDOS='^(\.github/|\.claude/|e2e/|CLAUDE\.md$|REVIEW\.md$|AGENTS\.md$|docs/testes-removidos\.md$|docs/proteger-main\.md$|playwright\.config\.ts$|eslint\.config\.mjs$|tsconfig\.json$|scripts/(checar|regras-do-agente|hook-antes-do-comando)\.)'
+
+          gh api --paginate "repos/$REPO/pulls/$PR/files" \
+            --jq '.[] | [.status, .filename, (.previous_filename // "")] | @tsv' > arquivos.tsv
+
+          problemas=""
+          while IFS=$'\t' read -r situacao nome anterior; do
+            for caminho in "$nome" "$anterior"; do
+              if [ -n "$caminho" ] && [[ "$caminho" =~ $PROTEGIDOS ]]; then
+                problemas+="checagem alterada: $caminho"$'\n'
+              fi
+            done
+            if [ "$situacao" = "removed" ] && [[ "$nome" =~ \.test\.[cm]?[jt]sx?$ ]]; then
+              problemas+="teste removido: $nome"$'\n'
+            fi
+          done < arquivos.tsv
+
+          scripts() {
+            gh api -H "Accept: application/vnd.github.raw+json" \
+              "repos/$REPO/contents/package.json?ref=$1" --jq '.scripts | tojson'
+          }
+          # Em variáveis: se a leitura falhar, o set -e reprova o PR.
+          scripts_base="$(scripts "$BASE")"
+          scripts_pr="$(scripts "$HEAD")"
+          if [ "$scripts_base" != "$scripts_pr" ]; then
+            problemas+="scripts do package.json alterados"$'\n'
+          fi
+
+          if [ -n "$problemas" ]; then
+            printf '%s' "$problemas" | sort -u
+            echo "::error::Este PR mexe nas checagens. Só o dono do repositório pode aceitar."
+            exit 1
+          fi
+          echo "Nenhuma checagem foi alterada."
