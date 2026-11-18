@@ -485,7 +485,9 @@ function aplicar(cache: string, arquivo: string, arquivoStatus: string) {
     prontas.push({ perfilId: perfil.id, banco: c.banco, contas: c.contas });
   }
 
-  const hoje = new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10); // horário de Brasília
+  const hoje =
+    process.env.BUSCA_HOJE ||
+    new Date(Date.now() - 3 * 3_600_000).toISOString().slice(0, 10); // horário de Brasília
   const importado = aplicarOpenFinance(banco, prontas, hoje);
   if (process.env.DIAGNOSTICO)
     for (const l of conferirCartoes(banco, prontas, hoje)) console.log(l);

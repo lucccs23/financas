@@ -7,7 +7,8 @@ import type { NextConfig } from "next";
 //   As rotas do servidor (arquivos *.servidor.ts) ficam de fora.
 const online = process.env.GITHUB_PAGES === "1";
 const comSupabase = Boolean(
-  process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  process.env.NEXT_PUBLIC_SUPABASE_URL &&
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 );
 
 const nextConfig: NextConfig = {
@@ -23,7 +24,10 @@ const nextConfig: NextConfig = {
         images: { unoptimized: true },
         env: { NEXT_PUBLIC_MODO: comSupabase ? "nuvem" : "github" },
       }
-    : {}),
+    : process.env.FINANCAS_E2E === "1"
+      ? // Testes de ponta a ponta: não mexem na versão usada no computador (.next).
+        { distDir: ".next-e2e" }
+      : {}),
   turbopack: {
     // O arquivo de dados é escolhido na hora (pasta do projeto ou FINANCAS_ARQUIVO);
     // o aviso de "rastrear o projeto inteiro" não se aplica, porque o app não é
