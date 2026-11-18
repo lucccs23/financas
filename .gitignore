@@ -49,6 +49,11 @@ next-env.d.ts
 # versão online gerada
 /.next-online/
 
+# testes de ponta a ponta
+/.next-e2e/
+/.e2e/
+
 # atalhos do Windows e configurações locais
 *.lnk
-/.claude/
+/.claude/*
+!/.claude/skills/
