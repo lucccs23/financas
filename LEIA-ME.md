@@ -379,6 +379,17 @@ da **aplicação dela** na Pluggy:
 | Telas | `src/app/*/page.tsx` |
 | Formulários | `src/components/formularios-*.tsx` |
 
+## Verificação
+
+```bash
+npm run checar
+```
+
+Roda lint, tipos, testes, o build do site e os testes de ponta a ponta, com dados
+inventados. A primeira vez pede `npx playwright install chromium`. As regras de
+trabalho estão em `CLAUDE.md` e `REVIEW.md`; a proteção do `main`, em
+[docs/proteger-main.md](docs/proteger-main.md).
+
 ## Limites conhecidos
 
 - Ao editar uma conta fixa, você escolhe se a mudança vale "a partir deste mês"
