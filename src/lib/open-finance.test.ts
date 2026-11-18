@@ -122,23 +122,23 @@ describe("Open Finance", () => {
   it("dinheiro entre contas suas (mesmo nome ou CPF) fica só no saldo, sem virar renda", () => {
     const minha = {
       ...corrente,
-      owner: "Lucas Martins Martinez",
+      owner: "Ana Souza Lima",
       taxNumber: "123.456.789-00",
     };
     const deMim = tx({
       id: "m1",
       amount: 20,
-      description: "Transferência Recebida|LUCAS MARTINS MARTINEZ",
+      description: "Transferência Recebida|ANA SOUZA LIMA",
       category: "Transfer - PIX",
     });
     const daIrma = tx({
       id: "m2",
       amount: 63,
-      description: "Transferência Recebida|Mariane Caroline Martinez",
+      description: "Transferência Recebida|Bia Souza Lima",
       category: "Transfer - PIX",
       paymentData: {
         payer: {
-          name: "Mariane Caroline Martinez",
+          name: "Bia Souza Lima",
           documentNumber: { value: "987.654.321-00" },
         },
       },
@@ -678,7 +678,7 @@ describe("Open Finance", () => {
       const pagamento = tx({
         id: "pg",
         date: "2026-11-04",
-        amount: 2645.56,
+        amount: 700.56,
         type: "CREDIT",
         description: "Pagamento recebido",
         status: "PENDING",
@@ -913,7 +913,7 @@ describe("Open Finance", () => {
 
   it("RecargaPay é transferência, Mercado Livre não é supermercado, IOF é tarifa", () => {
     expect(
-      categoriaDaPluggy("Services", "Recargapay *Lucasmart", "saida"),
+      categoriaDaPluggy("Services", "Recargapay *Anasouza", "saida"),
     ).toBe("transferencia");
     expect(categoriaDaPluggy(null, "MERCADOLIVRE*LOJA", "saida")).toBe(
       "compras",
@@ -921,7 +921,7 @@ describe("Open Finance", () => {
     expect(categoriaDaPluggy(null, "Confianca Max", "saida")).not.toBe(
       "assinatura",
     );
-    expect(categoriaDaPluggy(null, "Supermercado Tauste", "saida")).toBe(
+    expect(categoriaDaPluggy(null, "Supermercado Central", "saida")).toBe(
       "mercado",
     );
     expect(
@@ -956,18 +956,18 @@ describe("Open Finance", () => {
 describe("Pix para você mesmo pelo cartão", () => {
   it("RecargaPay com o começo do seu nome é para você mesmo", () => {
     expect(
-      paraVoceMesmo("Recargapay *Lucasmart", ["LUCAS M MARTINEZ", "Lucas"]),
+      paraVoceMesmo("Recargapay *Anasouza", ["ANA S LIMA", "Ana"]),
     ).toBe(true);
-    expect(paraVoceMesmo("RECARGAPAY *LUCASMART", [null, "Lucas"])).toBe(true);
+    expect(paraVoceMesmo("RECARGAPAY *ANASOUZA", [null, "Ana"])).toBe(true);
   });
   it("de outra pessoa, ou sem RecargaPay, não", () => {
     expect(
-      paraVoceMesmo("Recargapay *Marianaca", [
-        "Lucas Martins Martinez",
-        "Lucas",
+      paraVoceMesmo("Recargapay *Biasouza", [
+        "Ana Souza Lima",
+        "Ana",
       ]),
     ).toBe(false);
-    expect(paraVoceMesmo("Mercadolivre*Lucasmart", ["Lucas"])).toBe(false);
+    expect(paraVoceMesmo("Mercadolivre*Anasouza", ["Ana"])).toBe(false);
   });
 });
 
@@ -977,15 +977,15 @@ describe("fatura: moeda e saldo anterior", () => {
       id: "1",
       date: "2026-11-01",
       description: "Anthropic",
-      amount: 20.33,
-      amountInAccountCurrency: 114.4,
+      amount: 15.2,
+      amountInAccountCurrency: 82.5,
       type: "DEBIT" as const,
     };
-    expect(emReais(t).amount).toBe(114.4);
-    expect(emReais({ ...t, amountInAccountCurrency: null }).amount).toBe(20.33);
+    expect(emReais(t).amount).toBe(82.5);
+    expect(emReais({ ...t, amountInAccountCurrency: null }).amount).toBe(15.2);
     expect(
-      emReais({ ...t, amount: -20.33, type: "CREDIT" as const }).amount,
-    ).toBe(-114.4);
+      emReais({ ...t, amount: -15.2, type: "CREDIT" as const }).amount,
+    ).toBe(-82.5);
   });
 
   it("o que ficou sem pagar da fatura vencida vai para a seguinte", () => {
@@ -998,17 +998,17 @@ describe("fatura: moeda e saldo anterior", () => {
     });
     const saldo = saldoNaoPago(
       [
-        { dueDate: "2026-11-09", totalAmount: 3450.2604 },
-        { dueDate: "2026-10-07", totalAmount: 1082.1 },
+        { dueDate: "2026-11-09", totalAmount: 1200.2604 },
+        { dueDate: "2026-10-07", totalAmount: 900.1 },
       ],
-      [pagamento(2645.56), pagamento(400)],
+      [pagamento(700.56), pagamento(400)],
       () => "2026-12",
       "2026-11-12",
     );
     expect(saldo).toMatchObject({
       mes: "2026-11",
       proxima: "2026-12",
-      valor: 40_470,
+      valor: 9_970,
       rotulo: "nov/26",
     });
   });
@@ -1018,12 +1018,12 @@ describe("fatura: moeda e saldo anterior", () => {
       id: "p",
       date: "2026-11-04",
       description: "Pagamento recebido",
-      amount: -3450.26,
+      amount: -1200.26,
       type: "CREDIT" as const,
     };
     expect(
       saldoNaoPago(
-        [{ dueDate: "2026-11-09", totalAmount: 3450.26 }],
+        [{ dueDate: "2026-11-09", totalAmount: 1200.26 }],
         [pago],
         () => "2026-12",
         "2026-11-12",
@@ -1031,7 +1031,7 @@ describe("fatura: moeda e saldo anterior", () => {
     ).toBeNull();
     expect(
       saldoNaoPago(
-        [{ dueDate: "2026-11-20", totalAmount: 3450.26 }],
+        [{ dueDate: "2026-11-20", totalAmount: 1200.26 }],
         [],
         () => "2026-12",
         "2026-11-12",

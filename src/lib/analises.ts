@@ -28,7 +28,7 @@ const SUFIXO_PARCELA =
   /\s*(·\s*)?(parc(ela)?\.?\s*)\d{1,2}\s*\/\s*\d{1,2}\s*$/i;
 const PARCELA_N = /parcela\s*(\d+)\s*\/\s*\d+\s*$/i;
 
-/** "Recargapay *Lucasmart · parcela 2/3" → "Recargapay Lucasmart". */
+/** "Recargapay *Anasouza · parcela 2/3" → "Recargapay Anasouza". */
 export function nomeDoLugar(descricao: string): string {
   const limpo = descricao
     .replace(SUFIXO_PARCELA, "")

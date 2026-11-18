@@ -60,7 +60,7 @@ const saida = (o: Partial<Dados["transacoes"][number]>) =>
     tipo: "saida",
     valor: 5_000,
     data: "2026-11-10",
-    descricao: "Supermercado Tauste",
+    descricao: "Supermercado Central",
     categoria: "mercado",
     soSaldo: false,
     ...o,
@@ -123,10 +123,10 @@ describe("análises", () => {
   });
 
   it("nome do lugar sem parcela nem asterisco", () => {
-    expect(nomeDoLugar("Recargapay *Lucasmart · parcela 2/3")).toBe(
-      "Recargapay Lucasmart",
+    expect(nomeDoLugar("Recargapay *Anasouza · parcela 2/3")).toBe(
+      "Recargapay Anasouza",
     );
-    expect(nomeDoLugar("SUPERMERCADO TAUSTE")).toBe("Supermercado Tauste");
+    expect(nomeDoLugar("SUPERMERCADO CENTRAL")).toBe("Supermercado Central");
   });
 
   it("onde mais gasta, tendência e números do mês", () => {
@@ -148,7 +148,7 @@ describe("análises", () => {
     const gastos = gastosDoPeriodo(d, "eu", meses);
     const lugares = ondeMaisGasta(gastos, "2026-11");
     expect(lugares[0]).toMatchObject({
-      onde: "Supermercado Tauste",
+      onde: "Supermercado Central",
       total: 10_000,
       vezes: 2,
       ticketMedio: 5_000,

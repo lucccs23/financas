@@ -451,7 +451,7 @@ function soMudaDeLugar(categoria: string | null | undefined) {
  */
 /**
  * Pix pago com o cartão para você mesmo (RecargaPay mostra "Recargapay
- * *Lucasmart", com o começo do nome de quem pagou). Conta como gasto (você
+ * *Anasouza", com o começo do nome de quem pagou). Conta como gasto (você
  * paga a fatura); só fica numa categoria própria.
  */
 export function paraVoceMesmo(
